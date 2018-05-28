@@ -3,7 +3,7 @@
   "description": "A Vue.js project",
   "main": "dist/vue-quagga.js",
   "cdn": "dist/vue-quagga.min.js",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Shintaro Tanaka <sin_tanaka@jsl.co.jp>",
   "license": "MIT",
   "scripts": {
