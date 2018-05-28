@@ -1,6 +1,6 @@
 {
   "name": "vue-quaggajs",
-  "description": "A Vue.js project",
+  "description": "A Vue.js component, accessing the device camera and allowing users to read barcodes, within the browser",
   "main": "dist/vue-quagga.js",
   "cdn": "dist/vue-quagga.min.js",
   "version": "1.0.4",
@@ -13,11 +13,20 @@
   "keywords": [
     "quagga",
     "vue",
-    "barcode"
+    "barcode-reader",
+    "barcode-scanner"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sin-tanaka/vue-quagga.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sin-tanaka/vue-quagga/issues"
+  },
   "dependencies": {
     "quagga": "^0.12.1",
-    "vue": "^2.5.11"
+    "vue": "^2.5.11",
+    "webrtc-adapter": "^6.2.1"
   },
   "browserslist": [
     "> 1%",
