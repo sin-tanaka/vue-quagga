@@ -1,6 +1,8 @@
 {
   "name": "vue-quaggajs",
   "description": "A Vue.js project",
+  "main": "index.js",
+  "cdn": "dist/vue-quagga.min.js",
   "version": "1.0.0",
   "author": "Shintaro Tanaka <sin_tanaka@jsl.co.jp>",
   "license": "MIT",
@@ -34,6 +36,7 @@
     "vue-loader": "^13.0.5",
     "vue-template-compiler": "^2.4.4",
     "webpack": "^3.6.0",
-    "webpack-dev-server": "^2.9.1"
+    "webpack-dev-server": "^2.9.1",
+    "webpack-merge": "^4.1.2"
   }
 }

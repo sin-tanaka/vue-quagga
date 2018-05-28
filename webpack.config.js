@@ -1,7 +1,8 @@
 var path = require('path')
+var merge = require('webpack-merge')
 var webpack = require('webpack')
 
-module.exports = {
+const baseConfig = {
   entry: './src/main.js',
   output: {
     path: path.resolve(__dirname, './dist'),
@@ -41,6 +42,7 @@ module.exports = {
   },
   resolve: {
     alias: {
+      '@src': path.resolve(__dirname, 'src'),
       'vue$': 'vue/dist/vue.esm.js'
     },
     extensions: ['*', '.js', '.vue', '.json']
@@ -54,25 +56,36 @@ module.exports = {
     hints: false
   },
   devtool: '#eval-source-map'
+};
+
+let config;
+if (process.env.NODE_ENV === 'production') {
+  const productionConfig = merge(baseConfig, {
+    devtool: '#source-map',
+    plugins: (module.exports.plugins || []).concat([
+      new webpack.DefinePlugin({
+        'process.env': {
+          NODE_ENV: '"production"'
+        }
+      }),
+      new webpack.optimize.UglifyJsPlugin({
+        sourceMap: true,
+        compress: {
+          warnings: false
+        }
+      }),
+      new webpack.LoaderOptionsPlugin({
+        minimize: true
+      })
+    ]),
+    entry: path.resolve(__dirname + '/src/plugins.js'),
+    output: {
+      filename: 'vue-quagga.min.js',
+      libraryTarget: 'window',
+      library: 'Scanner'
+    }
+  });
+  config = productionConfig;
 }
 
-if (process.env.NODE_ENV === 'production') {
-  module.exports.devtool = '#source-map'
-  // http://vue-loader.vuejs.org/en/workflow/production.html
-  module.exports.plugins = (module.exports.plugins || []).concat([
-    new webpack.DefinePlugin({
-      'process.env': {
-        NODE_ENV: '"production"'
-      }
-    }),
-    new webpack.optimize.UglifyJsPlugin({
-      sourceMap: true,
-      compress: {
-        warnings: false
-      }
-    }),
-    new webpack.LoaderOptionsPlugin({
-      minimize: true
-    })
-  ])
-}
+module.exports = config;
