@@ -3,7 +3,7 @@ var merge = require('webpack-merge')
 var webpack = require('webpack')
 
 const baseConfig = {
-  entry: './src/main.js',
+  entry: './src/index.js',
   output: {
     path: path.resolve(__dirname, './dist'),
     publicPath: '/dist/',
