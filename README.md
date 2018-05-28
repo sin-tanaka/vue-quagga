@@ -1,18 +1,29 @@
 # vue-quaggajs
 
-> A Vue.js project
+[quaggajs](https://serratus.github.io/quaggaJS/) 's wrapper for Vue.js
 
-## Build Setup
+## Installtion
+
+### npm
 
 ``` bash
-# install dependencies
-npm install
-
-# serve with hot reload at localhost:8080
-npm run dev
-
-# build for production with minification
-npm run build
+npm i vue-quagga
 ```
 
-For detailed explanation on how things work, consult the [docs for vue-loader](http://vuejs.github.io/vue-loader).
+```vue
+<template>
+  <scanner></scanner>
+</template>
+
+<script>
+import Scanner from 'vue-quagga';
+
+export default {
+  //...
+  components: {
+    'scanner': Scanner,
+  },
+  // ...
+}
+</script>
+
