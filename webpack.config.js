@@ -57,7 +57,8 @@ const baseConfig = {
   },
   devtool: '#eval-source-map',
   externals: {
-    quagga: 'quagga'
+    'quagga': 'quagga',
+    'webrtc-adapter': 'webrtc-adapter',
   }
 };
 
