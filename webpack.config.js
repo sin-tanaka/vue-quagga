@@ -60,6 +60,7 @@ const baseConfig = {
 
 let config;
 if (process.env.NODE_ENV === 'production') {
+
   const productionConfig = merge(baseConfig, {
     devtool: '#source-map',
     plugins: (module.exports.plugins || []).concat([
@@ -78,14 +79,27 @@ if (process.env.NODE_ENV === 'production') {
         minimize: true
       })
     ]),
-    entry: path.resolve(__dirname + '/src/plugins.js'),
-    output: {
-      filename: 'vue-quagga.min.js',
-      libraryTarget: 'window',
-      library: 'Scanner'
-    }
   });
-  config = productionConfig;
+  config = [
+    merge(productionConfig, {
+      entry: path.resolve(__dirname + '/src/plugins.js'),
+      output: {
+        filename: 'vue-quagga.min.js',
+        libraryTarget: 'window',
+        library: 'Scanner'
+      }
+    }),
+    merge(productionConfig,
+      {
+        entry: path.resolve(__dirname + '/src/index.js'),
+        output: {
+          filename: 'vue-quagga.js',
+          libraryTarget: 'umd',
+          library: 'Scanner',
+          umdNamedDefine: true
+        }
+      }),
+  ];
 }
 
 module.exports = config;
