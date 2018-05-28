@@ -7,7 +7,7 @@
 ### npm
 
 ``` bash
-npm i vue-quagga
+npm i vue-quaggajs
 ```
 
 ```vue
@@ -16,14 +16,36 @@ npm i vue-quagga
 </template>
 
 <script>
-import Scanner from 'vue-quagga';
+import Scanner from 'vue-quaggajs';
 
 export default {
   //...
   components: {
-    'scanner': Scanner,
+    Scanner,
   },
   // ...
 }
 </script>
+```
 
+
+### cdn
+
+```html
+<body>
+<div id="app">
+  <scanner></scanner>
+</div>
+<script src="https://unpkg.com/vue/dist/vue.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/sin-tanaka/vue-quagga/dist/vue-quagga.js"></script>
+<script>
+  new Vue({
+    el: '#app',
+    data: function() {
+      return {}
+    }
+  })
+  Vue.use(Scanner);
+</script>
+</body>
+```

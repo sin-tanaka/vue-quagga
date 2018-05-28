@@ -55,7 +55,10 @@ const baseConfig = {
   performance: {
     hints: false
   },
-  devtool: '#eval-source-map'
+  devtool: '#eval-source-map',
+  externals: {
+    quagga: 'quagga'
+  }
 };
 
 let config;

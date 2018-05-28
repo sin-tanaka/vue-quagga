@@ -1,5 +1,5 @@
 module.exports = {
   install: function(Vue, options) {
-    Vue.component('scanner', require('@src/Scanner'));
+    Vue.component('scanner', require('@src/Scanner.vue'));
   }
 };

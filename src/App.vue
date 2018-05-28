@@ -5,7 +5,8 @@
 </template>
 
 <script>
-  import Scanner from './Scanner'
+  // import Scanner from './Scanner'
+  import Scanner from 'vue-quagga'
 
   export default {
     name: 'app',
