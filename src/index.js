@@ -1,16 +1,16 @@
-import 'webrtc-adapter'
-import QuaggaScanner from "./Scanner.vue"
+import 'webrtc-adapter';
+import QuaggaScanner from './Scanner.vue';
 
 export const VERSION = '1.0.0';
 
 export const Scanner = QuaggaScanner;
 // Install the components
-export function install (Vue) {
+export function install(Vue) {
   Vue.component('quagga-scanner', QuaggaScanner);
 }
 
 // Expose the components
-export { QuaggaScanner }
+export { QuaggaScanner };
 
 /* -- Plugin definition & Auto-install -- */
 /* You shouldn't have to modify the code below */
@@ -20,17 +20,17 @@ const plugin = {
   /* eslint-disable no-undef */
   version: VERSION,
   install,
-}
+};
 
-export default plugin
+export default plugin;
 
 // Auto-install
-let GlobalVue = null
+let GlobalVue = null;
 if (typeof window !== 'undefined') {
-  GlobalVue = window.Vue
+  GlobalVue = window.Vue;
 } else if (typeof global !== 'undefined') {
-  GlobalVue = global.Vue
+  GlobalVue = global.Vue;
 }
 if (GlobalVue) {
-  GlobalVue.use(plugin)
+  GlobalVue.use(plugin);
 }
