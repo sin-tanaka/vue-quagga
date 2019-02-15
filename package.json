@@ -6,9 +6,10 @@
   "author": "Shintaro Tanaka <sin_tanaka@jsl.co.jp>",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env webpack-dev-server --mode development --open --hot --config webpack.dev.js",
-    "build": "cross-env webpack --mode production --progress --hide-modules --config webpack.prod.js",
-    "lint": "eslint src/**/*.{js,vue} --fix"
+    "dev": "cross-env webpack-dev-server --open --hot --config webpack.dev.js",
+    "build": "cross-env webpack --progress --hide-modules --config webpack.prod.js",
+    "lint": "eslint src/**/*.{js,vue} --fix",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "quagga",
