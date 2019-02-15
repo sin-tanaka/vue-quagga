@@ -17,9 +17,9 @@
       onProcessed: {
         type: Function,
       },
-      readerType: {
-        type: String,
-        default: 'code_128_reader',
+      readerTypes: {
+        type: Array,
+        default: ['code_128_reader'],
       },
       readerSize: {
         width : {
@@ -51,10 +51,7 @@
           numOfWorkers: 2,
           frequency: 10,
           decoder: {
-            readers: [{
-              format: this.readerType,
-              config: {}
-            }]
+            readers: this.readerTypes
           },
           locate: true
         },
