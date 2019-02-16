@@ -3,5 +3,6 @@ examples
 .gitignore
 .editorconfig
 .eslintrc.js
+.idea
 webpack.dev.js
 webpack.prod.js

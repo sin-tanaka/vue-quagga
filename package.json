@@ -9,7 +9,7 @@
     "dev": "cross-env webpack-dev-server --open --hot --config webpack.dev.js",
     "build": "cross-env webpack --progress --hide-modules --config webpack.prod.js",
     "lint": "eslint src/**/*.{js,vue} --fix",
-    "prepublishOnly": "npm run build"
+    "prepare": "npm run build"
   },
   "keywords": [
     "quagga",
