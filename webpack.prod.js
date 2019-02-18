@@ -14,7 +14,8 @@ module.exports = {
 
   output: {
     path: path.join(__dirname, './dist'),
-    filename: '[name].js'
+    filename: '[name].js',
+    libraryTarget: "commonjs2"
   },
 
   plugins: [
@@ -52,7 +53,7 @@ module.exports = {
   devtool: 'source-map',
 
   optimization: {
-    minimize: true,
+    minimize: false,
   },
 
 };
