@@ -1,3 +1,5 @@
+![](https://cdn-images-1.medium.com/max/1600/1*u5EN9YE4S2R7QbJ-rHOZpg.gif)
+
 # vue-quaggajs
 
 [quaggajs](https://serratus.github.io/quaggaJS/) 's wrapper for Vue.js
@@ -10,20 +12,39 @@
 npm i vue-quaggajs
 ```
 
-```vue
+# Basic Example
+
+```
 <template>
-  <quagga-scanner></quagga-scanner>
+  <div>
+    <v-quagga :onDetected="logIt" :readerSize="readerSize" :readerType="['ean_reader']"></v-quagga>
+  </div>
 </template>
 
 <script>
-import { QuaggaScanner } from 'vue-quaggajs';
+import Vue from 'vue'
+import VueQuagga from 'vue-quaggajs';
+
+// register component 'v-quagga'
+Vue.use(VueQuagga);
 
 export default {
-  //...
-  components: {
-    QuaggaScanner,
+  name: 'VueBarcodeTest',
+  data () {
+    return {
+      readerSize: {
+        width: 640,
+        height: 480
+      },
+      detecteds: []
+    }
   },
-  // ...
+  methods: {
+    logIt (data) {
+      console.log('detected', data)
+    }
+
+  }
 }
 </script>
 ```
@@ -74,13 +95,13 @@ function (result) {
 },
 ```
 
-### readerType: String
+### readerType: String[]
 
 Set reading barcode type.
 
 Reference: [https://github.com/serratus/quaggaJS#decoder](https://github.com/serratus/quaggaJS#decoder)
 
-default: `'code_128_reader'`
+default: `['code_128_reader']`
 
 ### readerSize: Object {width: Number, height: Number}
 
@@ -95,39 +116,5 @@ default:
 }
 ```
 
-# Basic Example
-
-```
-<template>
-  <div>
-    <quagga-scanner :onDetected="logIt" :readerSize="readerSize" :readerType="'ean_reader'"></quagga-scanner>
-  </div>
-</template>
-
-<script>
-import { QuaggaScanner } from 'vue-quaggajs'
-export default {
-  name: 'VueBarcodeTest',
-  data () {
-    return {
-      readerSize: {
-        width: 640,
-        height: 480
-      },
-      detecteds: []
-    }
-  },
-  components: {
-    QuaggaScanner
-  },
-  methods: {
-    logIt (data) {
-      console.log('detected', data)
-    }
-
-  }
-}
-</script>
-```
 
 

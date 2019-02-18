@@ -3,9 +3,8 @@
     <v-quagga :onDetected="logIt" :readerSize="readerSize" :readerType="'ean_reader'"></v-quagga>
   </div>
 </template>
-<script>
-  // import VueQuagga from '../../src/Scanner.vue';
 
+<script>
   export default {
     name: 'VueBarcodeTest',
     data () {
@@ -17,9 +16,6 @@
         detecteds: []
       }
     },
-    // components: {
-    //   VueQuagga
-    // },
     methods: {
       logIt (data) {
         console.log('detected', data)
