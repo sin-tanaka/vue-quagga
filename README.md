@@ -17,7 +17,7 @@ npm i vue-quaggajs
 ```
 <template>
   <div>
-    <v-quagga :onDetected="logIt" :readerSize="readerSize" :readerType="['ean_reader']"></v-quagga>
+    <v-quagga :onDetected="logIt" :readerSize="readerSize" :readerTypes="['ean_reader']"></v-quagga>
   </div>
 </template>
 
