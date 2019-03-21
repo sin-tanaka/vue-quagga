@@ -2,7 +2,7 @@
   "name": "vue-quaggajs",
   "description": "A Vue.js component, accessing the device camera and allowing users to read barcodes, within the browser",
   "main": "dist/vue-quagga.js",
-  "module": "dist/vue-quagga.js",
+  "module": "src/index.js",
   "version": "1.0.8",
   "author": "Shintaro Tanaka <genaxy@gmail.com>",
   "license": "MIT",
@@ -25,7 +25,7 @@
   "bugs": {
     "url": "https://github.com/sin-tanaka/vue-quagga/issues"
   },
-  "peerDependencies": {
+  "dependencies": {
     "quagga": "^0.12.1",
     "vue": "^2.6.6",
     "webrtc-adapter": "^7.2.0"
