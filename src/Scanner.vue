@@ -66,6 +66,9 @@ export default {
     Quagga.onDetected(this.onDetected ? this.onDetected : this._onDetected);
     Quagga.onProcessed(this.onProcessed ? this.onProcessed : this._onProcessed);
   },
+  destroyed: function() {
+    Quagga.stop();
+  },
   methods: {
     _onProcessed: function(result) {
       let drawingCtx = Quagga.canvas.ctx.overlay;
