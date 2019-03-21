@@ -72,7 +72,7 @@ export default {
         height: 480,
       }),
       validator: o =>
-        typeof o.width === 'number' && typeof o.width === 'number',
+        typeof o.width === 'number' && typeof o.height === 'number',
     },
   },
   data: function() {
