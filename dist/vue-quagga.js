@@ -5369,10 +5369,54 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
   name: 'QuaggaScanner',
   props: {
     onDetected: {
-      type: Function
+      type: Function,
+      default: function _default(result) {
+        console.log('detected: ', result);
+      }
     },
     onProcessed: {
-      type: Function
+      type: Function,
+      default: function _default(result) {
+        var drawingCtx = quagga_min_default.a.canvas.ctx.overlay;
+        var drawingCanvas = quagga_min_default.a.canvas.dom.overlay;
+
+        if (result) {
+          if (result.boxes) {
+            drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute('width')), parseInt(drawingCanvas.getAttribute('height')));
+            result.boxes.filter(function (box) {
+              return box !== result.box;
+            }).forEach(function (box) {
+              quagga_min_default.a.ImageDebug.drawPath(box, {
+                x: 0,
+                y: 1
+              }, drawingCtx, {
+                color: 'green',
+                lineWidth: 2
+              });
+            });
+          }
+
+          if (result.box) {
+            quagga_min_default.a.ImageDebug.drawPath(result.box, {
+              x: 0,
+              y: 1
+            }, drawingCtx, {
+              color: '#00F',
+              lineWidth: 2
+            });
+          }
+
+          if (result.codeResult && result.codeResult.code) {
+            quagga_min_default.a.ImageDebug.drawPath(result.line, {
+              x: 'x',
+              y: 'y'
+            }, drawingCtx, {
+              color: 'red',
+              lineWidth: 3
+            });
+          }
+        }
+      }
     },
     readerTypes: {
       type: Array,
@@ -5381,13 +5425,15 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
       }
     },
     readerSize: {
-      width: {
-        type: Number,
-        default: 640
+      type: Object,
+      default: function _default() {
+        return {
+          width: 640,
+          height: 480
+        };
       },
-      height: {
-        type: Number,
-        default: 480
+      validator: function validator(o) {
+        return typeof o.width === 'number' && typeof o.width === 'number';
       }
     }
   },
@@ -5431,54 +5477,11 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
 
       quagga_min_default.a.start();
     });
-    quagga_min_default.a.onDetected(this.onDetected ? this.onDetected : this._onDetected);
-    quagga_min_default.a.onProcessed(this.onProcessed ? this.onProcessed : this._onProcessed);
+    quagga_min_default.a.onDetected(this.onDetected);
+    quagga_min_default.a.onProcessed(this.onProcessed);
   },
-  methods: {
-    _onProcessed: function _onProcessed(result) {
-      var drawingCtx = quagga_min_default.a.canvas.ctx.overlay;
-      var drawingCanvas = quagga_min_default.a.canvas.dom.overlay;
-
-      if (result) {
-        if (result.boxes) {
-          drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute('width')), parseInt(drawingCanvas.getAttribute('height')));
-          result.boxes.filter(function (box) {
-            return box !== result.box;
-          }).forEach(function (box) {
-            quagga_min_default.a.ImageDebug.drawPath(box, {
-              x: 0,
-              y: 1
-            }, drawingCtx, {
-              color: 'green',
-              lineWidth: 2
-            });
-          });
-        }
-
-        if (result.box) {
-          quagga_min_default.a.ImageDebug.drawPath(result.box, {
-            x: 0,
-            y: 1
-          }, drawingCtx, {
-            color: '#00F',
-            lineWidth: 2
-          });
-        }
-
-        if (result.codeResult && result.codeResult.code) {
-          quagga_min_default.a.ImageDebug.drawPath(result.line, {
-            x: 'x',
-            y: 'y'
-          }, drawingCtx, {
-            color: 'red',
-            lineWidth: 3
-          });
-        }
-      }
-    },
-    _onDetected: function _onDetected(result) {
-      console.log('detected: ', result);
-    }
+  destroyed: function destroyed() {
+    quagga_min_default.a.stop();
   }
 });
 // CONCATENATED MODULE: ./src/Scanner.vue?vue&type=script&lang=js&
