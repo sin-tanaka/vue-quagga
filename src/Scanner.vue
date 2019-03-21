@@ -19,19 +19,16 @@ export default {
     },
     readerTypes: {
       type: Array,
-      default: () => {
-        return ['code_128_reader'];
-      },
+      default: () => ['code_128_reader'],
     },
     readerSize: {
-      width: {
-        type: Number,
-        default: 640,
-      },
-      height: {
-        type: Number,
-        default: 480,
-      },
+      type: Object,
+      default: () => ({
+        width: 640,
+        height: 480,
+      }),
+      validator: o =>
+        typeof o.width === 'number' && typeof o.width === 'number',
     },
   },
   data: function() {
