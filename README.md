@@ -95,7 +95,7 @@ function (result) {
 },
 ```
 
-### readerType: String[]
+### readerTypes: String[]
 
 Set reading barcode type.
 
