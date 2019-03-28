@@ -5433,7 +5433,7 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
         };
       },
       validator: function validator(o) {
-        return typeof o.width === 'number' && typeof o.width === 'number';
+        return typeof o.width === 'number' && typeof o.height === 'number';
       }
     }
   },
