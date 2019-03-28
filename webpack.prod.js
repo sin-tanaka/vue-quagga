@@ -1,9 +1,7 @@
-const webpack = require('webpack');
 const path = require('path');
 
 const VueLoaderPlugin = require('vue-loader/lib/plugin');
 const vueLoaderPlugin = new VueLoaderPlugin();
-
 
 module.exports = {
   mode: 'production',
@@ -15,21 +13,16 @@ module.exports = {
   output: {
     path: path.join(__dirname, './dist'),
     filename: '[name].js',
-    libraryTarget: "commonjs2"
+    libraryTarget: 'commonjs2',
   },
 
-  plugins: [
-    vueLoaderPlugin
-  ],
+  plugins: [vueLoaderPlugin],
 
   module: {
     rules: [
       {
         test: /\.css$/,
-        use: [
-          'vue-style-loader',
-          'css-loader'
-        ],
+        use: ['vue-style-loader', 'css-loader'],
       },
       {
         test: /\.vue$/,
@@ -38,16 +31,16 @@ module.exports = {
       {
         test: /\.js$/,
         loader: 'babel-loader',
-        exclude: /node_modules/
+        exclude: /node_modules/,
       },
       {
         test: /\.(png|jpg|gif|svg)$/,
         loader: 'file-loader',
         options: {
-          name: '[name].[ext]?[hash]'
-        }
-      }
-    ]
+          name: '[name].[ext]?[hash]',
+        },
+      },
+    ],
   },
 
   devtool: 'source-map',
@@ -55,5 +48,4 @@ module.exports = {
   optimization: {
     minimize: false,
   },
-
 };

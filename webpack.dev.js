@@ -1,34 +1,25 @@
-const webpack = require('webpack');
 const path = require('path');
 
-const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
 const VueLoaderPlugin = require('vue-loader/lib/plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const htmlWebpackPlugin = new HtmlWebpackPlugin({
-    template: path.join(__dirname, 'examples/src/index.html'),
-    filename: './index.html'
+  template: path.join(__dirname, 'examples/src/index.html'),
+  filename: './index.html',
 });
 const vueLoaderPlugin = new VueLoaderPlugin();
-
 
 module.exports = {
   mode: 'development',
 
   entry: path.join(__dirname, 'examples/src/index.js'),
 
-  plugins: [
-    htmlWebpackPlugin,
-    vueLoaderPlugin
-  ],
+  plugins: [htmlWebpackPlugin, vueLoaderPlugin],
 
   module: {
     rules: [
       {
         test: /\.css$/,
-        use: [
-          'vue-style-loader',
-          'css-loader'
-        ],
+        use: ['vue-style-loader', 'css-loader'],
       },
       {
         test: /\.vue$/,
@@ -37,19 +28,19 @@ module.exports = {
       {
         test: /\.js$/,
         loader: 'babel-loader',
-        exclude: /node_modules/
+        exclude: /node_modules/,
       },
       {
         test: /\.(png|jpg|gif|svg)$/,
         loader: 'file-loader',
         options: {
-          name: '[name].[ext]?[hash]'
-        }
-      }
-    ]
+          name: '[name].[ext]?[hash]',
+        },
+      },
+    ],
   },
 
   devServer: {
-    port: 8001
+    port: 8001,
   },
 };
