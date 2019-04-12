@@ -5435,6 +5435,18 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
       validator: function validator(o) {
         return typeof o.width === 'number' && typeof o.height === 'number';
       }
+    },
+    aspectRatio: {
+      type: Object,
+      default: function _default() {
+        return {
+          min: 1,
+          max: 2
+        };
+      },
+      validator: function validator(o) {
+        return typeof o.min === 'number' && typeof o.max === 'number';
+      }
     }
   },
   data: function data() {
@@ -5472,7 +5484,7 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
   mounted: function mounted() {
     quagga_min_default.a.init(this.quaggaState, function (err) {
       if (err) {
-        return console.log(err);
+        return console.error(err);
       }
 
       quagga_min_default.a.start();
