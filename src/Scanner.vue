@@ -74,6 +74,14 @@ export default {
       validator: o =>
         typeof o.width === 'number' && typeof o.height === 'number',
     },
+    aspectRatio: {
+      type: Object,
+      default: () => ({
+        min: 1,
+        max: 2,
+      }),
+      validator: o => typeof o.min === 'number' && typeof o.max === 'number',
+    },
   },
   data: function() {
     return {
@@ -103,7 +111,7 @@ export default {
   mounted: function() {
     Quagga.init(this.quaggaState, function(err) {
       if (err) {
-        return console.log(err);
+        return console.error(err);
       }
       Quagga.start();
     });

@@ -3,7 +3,7 @@
   "description": "A Vue.js component, accessing the device camera and allowing users to read barcodes, within the browser",
   "main": "dist/vue-quagga.js",
   "module": "src/index.js",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "author": "Shintaro Tanaka <genaxy@gmail.com>",
   "license": "MIT",
   "scripts": {

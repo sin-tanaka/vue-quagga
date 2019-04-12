@@ -1,6 +1,12 @@
 <template>
   <div>
-    <v-quagga :onDetected="logIt" :readerSize="readerSize" :readerType="'ean_reader'"></v-quagga>
+    <h1>Barcode Reader</h1>
+    <v-quagga
+      :onDetected="logIt"
+      :readerSize="readerSize"
+      :readerType="'ean_reader'"
+      :aspectRatio="aspectRatio"
+    ></v-quagga>
   </div>
 </template>
 
@@ -13,6 +19,7 @@
           width: 640,
           height: 480
         },
+        aspectRatio: { min: 1, max: 2 },
         detecteds: []
       }
     },

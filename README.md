@@ -116,5 +116,15 @@ default:
 }
 ```
 
+### aspectRatio: Object {min: Number, max: Number}
 
+Set aspect ratio. it affects <video> aspect ratio.
 
+default:
+
+```js
+{
+  min: 1,
+  max: 2,
+}
+```
