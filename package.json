@@ -3,7 +3,7 @@
   "description": "A Vue.js component, accessing the device camera and allowing users to read barcodes, within the browser",
   "main": "dist/vue-quagga.js",
   "module": "src/index.js",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "author": "Shintaro Tanaka <genaxy@gmail.com>",
   "license": "MIT",
   "scripts": {
@@ -26,7 +26,7 @@
     "url": "https://github.com/sin-tanaka/vue-quagga/issues"
   },
   "peerDependencies": {
-    "vue": "^2.6.6"
+    "vue": "^2.6.11"
   },
   "dependencies": {
     "quagga": "^0.12.1",
@@ -60,7 +60,7 @@
     "prettier": "^1.16.4",
     "uglifyjs-webpack-plugin": "^2.1.1",
     "vue-loader": "^15.6.2",
-    "vue-template-compiler": "^2.6.6",
+    "vue-template-compiler": "^2.6.11",
     "webpack": "^4.29.3",
     "webpack-cli": "^3.2.3",
     "webpack-dev-server": "^3.1.14",

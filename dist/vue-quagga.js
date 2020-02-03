@@ -5481,6 +5481,16 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
       }
     };
   },
+  watch: {
+    onDetected: function onDetected(oldValue, newValue) {
+      if (oldValue) quagga_min_default.a.offDetected(oldValue);
+      if (newValue) quagga_min_default.a.onDetected(newValue);
+    },
+    onProcessed: function onProcessed(oldValue, newValue) {
+      if (oldValue) quagga_min_default.a.offProcessed(oldValue);
+      if (newValue) quagga_min_default.a.onProcessed(newValue);
+    }
+  },
   mounted: function mounted() {
     quagga_min_default.a.init(this.quaggaState, function (err) {
       if (err) {
@@ -5493,6 +5503,8 @@ var quagga_min_default = /*#__PURE__*/__webpack_require__.n(quagga_min);
     quagga_min_default.a.onProcessed(this.onProcessed);
   },
   destroyed: function destroyed() {
+    if (this.onDetected) quagga_min_default.a.offDetected(this.onDetected);
+    if (this.onProcessed) quagga_min_default.a.offProcessed(this.offProcessed);
     quagga_min_default.a.stop();
   }
 });
