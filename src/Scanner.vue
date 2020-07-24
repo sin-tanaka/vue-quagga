@@ -108,6 +108,16 @@ export default {
       },
     };
   },
+  watch: {
+    onDetected: function(oldValue, newValue) {
+      if (oldValue) Quagga.offDetected(oldValue);
+      if (newValue) Quagga.onDetected(newValue);
+    },
+    onProcessed: function(oldValue, newValue) {
+      if (oldValue) Quagga.offProcessed(oldValue);
+      if (newValue) Quagga.onProcessed(newValue);
+    },
+  },
   mounted: function() {
     Quagga.init(this.quaggaState, function(err) {
       if (err) {
@@ -119,6 +129,8 @@ export default {
     Quagga.onProcessed(this.onProcessed);
   },
   destroyed: function() {
+    if (this.onDetected) Quagga.offDetected(this.onDetected);
+    if (this.onProcessed) Quagga.offProcessed(this.offProcessed);
     Quagga.stop();
   },
 };
