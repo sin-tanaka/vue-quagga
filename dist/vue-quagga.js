@@ -96,7 +96,7 @@ module.exports =
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
- /* eslint-env node */
+/* eslint-env node */
 
 
 // SDP helpers.
@@ -276,8 +276,8 @@ SDPUtils.parseExtmap = function(line) {
 SDPUtils.writeExtmap = function(headerExtension) {
   return 'a=extmap:' + (headerExtension.id || headerExtension.preferredId) +
       (headerExtension.direction && headerExtension.direction !== 'sendrecv'
-          ? '/' + headerExtension.direction
-          : '') +
+        ? '/' + headerExtension.direction
+        : '') +
       ' ' + headerExtension.uri + '\r\n';
 };
 
@@ -392,7 +392,7 @@ SDPUtils.parseFingerprint = function(line) {
 //   get the fingerprint line as input. See also getIceParameters.
 SDPUtils.getDtlsParameters = function(mediaSection, sessionpart) {
   var lines = SDPUtils.matchPrefix(mediaSection + sessionpart,
-      'a=fingerprint:');
+    'a=fingerprint:');
   // Note: a=setup line is ignored since we use the 'auto' role.
   // Note2: 'algorithm' is not case sensitive except in Edge.
   return {
@@ -409,22 +409,76 @@ SDPUtils.writeDtlsParameters = function(params, setupType) {
   });
   return sdp;
 };
+
+// Parses a=crypto lines into
+//   https://rawgit.com/aboba/edgertc/master/msortc-rs4.html#dictionary-rtcsrtpsdesparameters-members
+SDPUtils.parseCryptoLine = function(line) {
+  var parts = line.substr(9).split(' ');
+  return {
+    tag: parseInt(parts[0], 10),
+    cryptoSuite: parts[1],
+    keyParams: parts[2],
+    sessionParams: parts.slice(3),
+  };
+};
+
+SDPUtils.writeCryptoLine = function(parameters) {
+  return 'a=crypto:' + parameters.tag + ' ' +
+    parameters.cryptoSuite + ' ' +
+    (typeof parameters.keyParams === 'object'
+      ? SDPUtils.writeCryptoKeyParams(parameters.keyParams)
+      : parameters.keyParams) +
+    (parameters.sessionParams ? ' ' + parameters.sessionParams.join(' ') : '') +
+    '\r\n';
+};
+
+// Parses the crypto key parameters into
+//   https://rawgit.com/aboba/edgertc/master/msortc-rs4.html#rtcsrtpkeyparam*
+SDPUtils.parseCryptoKeyParams = function(keyParams) {
+  if (keyParams.indexOf('inline:') !== 0) {
+    return null;
+  }
+  var parts = keyParams.substr(7).split('|');
+  return {
+    keyMethod: 'inline',
+    keySalt: parts[0],
+    lifeTime: parts[1],
+    mkiValue: parts[2] ? parts[2].split(':')[0] : undefined,
+    mkiLength: parts[2] ? parts[2].split(':')[1] : undefined,
+  };
+};
+
+SDPUtils.writeCryptoKeyParams = function(keyParams) {
+  return keyParams.keyMethod + ':'
+    + keyParams.keySalt +
+    (keyParams.lifeTime ? '|' + keyParams.lifeTime : '') +
+    (keyParams.mkiValue && keyParams.mkiLength
+      ? '|' + keyParams.mkiValue + ':' + keyParams.mkiLength
+      : '');
+};
+
+// Extracts all SDES paramters.
+SDPUtils.getCryptoParameters = function(mediaSection, sessionpart) {
+  var lines = SDPUtils.matchPrefix(mediaSection + sessionpart,
+    'a=crypto:');
+  return lines.map(SDPUtils.parseCryptoLine);
+};
+
 // Parses ICE information from SDP media section or sessionpart.
 // FIXME: for consistency with other functions this should only
 //   get the ice-ufrag and ice-pwd lines as input.
 SDPUtils.getIceParameters = function(mediaSection, sessionpart) {
-  var lines = SDPUtils.splitLines(mediaSection);
-  // Search in session part, too.
-  lines = lines.concat(SDPUtils.splitLines(sessionpart));
-  var iceParameters = {
-    usernameFragment: lines.filter(function(line) {
-      return line.indexOf('a=ice-ufrag:') === 0;
-    })[0].substr(12),
-    password: lines.filter(function(line) {
-      return line.indexOf('a=ice-pwd:') === 0;
-    })[0].substr(10)
+  var ufrag = SDPUtils.matchPrefix(mediaSection + sessionpart,
+    'a=ice-ufrag:')[0];
+  var pwd = SDPUtils.matchPrefix(mediaSection + sessionpart,
+    'a=ice-pwd:')[0];
+  if (!(ufrag && pwd)) {
+    return null;
+  }
+  return {
+    usernameFragment: ufrag.substr(12),
+    password: pwd.substr(10),
   };
-  return iceParameters;
 };
 
 // Serializes ICE parameters to SDP.
@@ -446,15 +500,15 @@ SDPUtils.parseRtpParameters = function(mediaSection) {
   for (var i = 3; i < mline.length; i++) { // find all codecs from mline[3..]
     var pt = mline[i];
     var rtpmapline = SDPUtils.matchPrefix(
-        mediaSection, 'a=rtpmap:' + pt + ' ')[0];
+      mediaSection, 'a=rtpmap:' + pt + ' ')[0];
     if (rtpmapline) {
       var codec = SDPUtils.parseRtpMap(rtpmapline);
       var fmtps = SDPUtils.matchPrefix(
-          mediaSection, 'a=fmtp:' + pt + ' ');
+        mediaSection, 'a=fmtp:' + pt + ' ');
       // Only the first a=fmtp:<pt> is considered.
       codec.parameters = fmtps.length ? SDPUtils.parseFmtp(fmtps[0]) : {};
       codec.rtcpFeedback = SDPUtils.matchPrefix(
-          mediaSection, 'a=rtcp-fb:' + pt + ' ')
+        mediaSection, 'a=rtcp-fb:' + pt + ' ')
         .map(SDPUtils.parseRtcpFb);
       description.codecs.push(codec);
       // parse FEC mechanisms from rtpmap lines.
@@ -530,22 +584,22 @@ SDPUtils.parseRtpEncodingParameters = function(mediaSection) {
 
   // filter a=ssrc:... cname:, ignore PlanB-msid
   var ssrcs = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-  .map(function(line) {
-    return SDPUtils.parseSsrcMedia(line);
-  })
-  .filter(function(parts) {
-    return parts.attribute === 'cname';
-  });
+    .map(function(line) {
+      return SDPUtils.parseSsrcMedia(line);
+    })
+    .filter(function(parts) {
+      return parts.attribute === 'cname';
+    });
   var primarySsrc = ssrcs.length > 0 && ssrcs[0].ssrc;
   var secondarySsrc;
 
   var flows = SDPUtils.matchPrefix(mediaSection, 'a=ssrc-group:FID')
-  .map(function(line) {
-    var parts = line.substr(17).split(' ');
-    return parts.map(function(part) {
-      return parseInt(part, 10);
+    .map(function(line) {
+      var parts = line.substr(17).split(' ');
+      return parts.map(function(part) {
+        return parseInt(part, 10);
+      });
     });
-  });
   if (flows.length > 0 && flows[0].length > 1 && flows[0][0] === primarySsrc) {
     secondarySsrc = flows[0][1];
   }
@@ -602,12 +656,12 @@ SDPUtils.parseRtcpParameters = function(mediaSection) {
   // Gets the first SSRC. Note tha with RTX there might be multiple
   // SSRCs.
   var remoteSsrc = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-      .map(function(line) {
-        return SDPUtils.parseSsrcMedia(line);
-      })
-      .filter(function(obj) {
-        return obj.attribute === 'cname';
-      })[0];
+    .map(function(line) {
+      return SDPUtils.parseSsrcMedia(line);
+    })
+    .filter(function(obj) {
+      return obj.attribute === 'cname';
+    })[0];
   if (remoteSsrc) {
     rtcpParameters.cname = remoteSsrc.value;
     rtcpParameters.ssrc = remoteSsrc.ssrc;
@@ -637,16 +691,76 @@ SDPUtils.parseMsid = function(mediaSection) {
     return {stream: parts[0], track: parts[1]};
   }
   var planB = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-  .map(function(line) {
-    return SDPUtils.parseSsrcMedia(line);
-  })
-  .filter(function(msidParts) {
-    return msidParts.attribute === 'msid';
-  });
+    .map(function(line) {
+      return SDPUtils.parseSsrcMedia(line);
+    })
+    .filter(function(msidParts) {
+      return msidParts.attribute === 'msid';
+    });
   if (planB.length > 0) {
     parts = planB[0].value.split(' ');
     return {stream: parts[0], track: parts[1]};
   }
+};
+
+// SCTP
+// parses draft-ietf-mmusic-sctp-sdp-26 first and falls back
+// to draft-ietf-mmusic-sctp-sdp-05
+SDPUtils.parseSctpDescription = function(mediaSection) {
+  var mline = SDPUtils.parseMLine(mediaSection);
+  var maxSizeLine = SDPUtils.matchPrefix(mediaSection, 'a=max-message-size:');
+  var maxMessageSize;
+  if (maxSizeLine.length > 0) {
+    maxMessageSize = parseInt(maxSizeLine[0].substr(19), 10);
+  }
+  if (isNaN(maxMessageSize)) {
+    maxMessageSize = 65536;
+  }
+  var sctpPort = SDPUtils.matchPrefix(mediaSection, 'a=sctp-port:');
+  if (sctpPort.length > 0) {
+    return {
+      port: parseInt(sctpPort[0].substr(12), 10),
+      protocol: mline.fmt,
+      maxMessageSize: maxMessageSize
+    };
+  }
+  var sctpMapLines = SDPUtils.matchPrefix(mediaSection, 'a=sctpmap:');
+  if (sctpMapLines.length > 0) {
+    var parts = SDPUtils.matchPrefix(mediaSection, 'a=sctpmap:')[0]
+      .substr(10)
+      .split(' ');
+    return {
+      port: parseInt(parts[0], 10),
+      protocol: parts[1],
+      maxMessageSize: maxMessageSize
+    };
+  }
+};
+
+// SCTP
+// outputs the draft-ietf-mmusic-sctp-sdp-26 version that all browsers
+// support by now receiving in this format, unless we originally parsed
+// as the draft-ietf-mmusic-sctp-sdp-05 format (indicated by the m-line
+// protocol of DTLS/SCTP -- without UDP/ or TCP/)
+SDPUtils.writeSctpDescription = function(media, sctp) {
+  var output = [];
+  if (media.protocol !== 'DTLS/SCTP') {
+    output = [
+      'm=' + media.kind + ' 9 ' + media.protocol + ' ' + sctp.protocol + '\r\n',
+      'c=IN IP4 0.0.0.0\r\n',
+      'a=sctp-port:' + sctp.port + '\r\n'
+    ];
+  } else {
+    output = [
+      'm=' + media.kind + ' 9 ' + media.protocol + ' ' + sctp.port + '\r\n',
+      'c=IN IP4 0.0.0.0\r\n',
+      'a=sctpmap:' + sctp.port + ' ' + sctp.protocol + ' 65535\r\n'
+    ];
+  }
+  if (sctp.maxMessageSize !== undefined) {
+    output.push('a=max-message-size:' + sctp.maxMessageSize + '\r\n');
+  }
+  return output.join('');
 };
 
 // Generate a session ID for SDP.
@@ -684,12 +798,12 @@ SDPUtils.writeMediaSection = function(transceiver, caps, type, stream) {
 
   // Map ICE parameters (ufrag, pwd) to SDP.
   sdp += SDPUtils.writeIceParameters(
-      transceiver.iceGatherer.getLocalParameters());
+    transceiver.iceGatherer.getLocalParameters());
 
   // Map DTLS parameters to SDP.
   sdp += SDPUtils.writeDtlsParameters(
-      transceiver.dtlsTransport.getLocalParameters(),
-      type === 'offer' ? 'actpass' : 'active');
+    transceiver.dtlsTransport.getLocalParameters(),
+    type === 'offer' ? 'actpass' : 'active');
 
   sdp += 'a=mid:' + transceiver.mid + '\r\n';
 
@@ -2805,7 +2919,10 @@ function toComment(sourceMap) {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
+// ESM COMPAT FLAG
 __webpack_require__.r(__webpack_exports__);
+
+// NAMESPACE OBJECT: ./node_modules/webrtc-adapter/src/js/chrome/chrome_shim.js
 var chrome_shim_namespaceObject = {};
 __webpack_require__.r(chrome_shim_namespaceObject);
 __webpack_require__.d(chrome_shim_namespaceObject, "shimGetUserMedia", function() { return shimGetUserMedia; });
@@ -2813,17 +2930,22 @@ __webpack_require__.d(chrome_shim_namespaceObject, "shimGetDisplayMedia", functi
 __webpack_require__.d(chrome_shim_namespaceObject, "shimMediaStream", function() { return shimMediaStream; });
 __webpack_require__.d(chrome_shim_namespaceObject, "shimOnTrack", function() { return shimOnTrack; });
 __webpack_require__.d(chrome_shim_namespaceObject, "shimGetSendersWithDtmf", function() { return shimGetSendersWithDtmf; });
+__webpack_require__.d(chrome_shim_namespaceObject, "shimGetStats", function() { return shimGetStats; });
 __webpack_require__.d(chrome_shim_namespaceObject, "shimSenderReceiverGetStats", function() { return shimSenderReceiverGetStats; });
 __webpack_require__.d(chrome_shim_namespaceObject, "shimAddTrackRemoveTrackWithNative", function() { return shimAddTrackRemoveTrackWithNative; });
 __webpack_require__.d(chrome_shim_namespaceObject, "shimAddTrackRemoveTrack", function() { return shimAddTrackRemoveTrack; });
 __webpack_require__.d(chrome_shim_namespaceObject, "shimPeerConnection", function() { return shimPeerConnection; });
 __webpack_require__.d(chrome_shim_namespaceObject, "fixNegotiationNeeded", function() { return fixNegotiationNeeded; });
+
+// NAMESPACE OBJECT: ./node_modules/webrtc-adapter/src/js/edge/edge_shim.js
 var edge_shim_namespaceObject = {};
 __webpack_require__.r(edge_shim_namespaceObject);
 __webpack_require__.d(edge_shim_namespaceObject, "shimGetUserMedia", function() { return getusermedia_shimGetUserMedia; });
 __webpack_require__.d(edge_shim_namespaceObject, "shimGetDisplayMedia", function() { return getdisplaymedia_shimGetDisplayMedia; });
 __webpack_require__.d(edge_shim_namespaceObject, "shimPeerConnection", function() { return edge_shim_shimPeerConnection; });
 __webpack_require__.d(edge_shim_namespaceObject, "shimReplaceTrack", function() { return shimReplaceTrack; });
+
+// NAMESPACE OBJECT: ./node_modules/webrtc-adapter/src/js/firefox/firefox_shim.js
 var firefox_shim_namespaceObject = {};
 __webpack_require__.r(firefox_shim_namespaceObject);
 __webpack_require__.d(firefox_shim_namespaceObject, "shimGetUserMedia", function() { return firefox_getusermedia_shimGetUserMedia; });
@@ -2834,6 +2956,12 @@ __webpack_require__.d(firefox_shim_namespaceObject, "shimSenderGetStats", functi
 __webpack_require__.d(firefox_shim_namespaceObject, "shimReceiverGetStats", function() { return shimReceiverGetStats; });
 __webpack_require__.d(firefox_shim_namespaceObject, "shimRemoveStream", function() { return shimRemoveStream; });
 __webpack_require__.d(firefox_shim_namespaceObject, "shimRTCDataChannel", function() { return shimRTCDataChannel; });
+__webpack_require__.d(firefox_shim_namespaceObject, "shimAddTransceiver", function() { return shimAddTransceiver; });
+__webpack_require__.d(firefox_shim_namespaceObject, "shimGetParameters", function() { return shimGetParameters; });
+__webpack_require__.d(firefox_shim_namespaceObject, "shimCreateOffer", function() { return shimCreateOffer; });
+__webpack_require__.d(firefox_shim_namespaceObject, "shimCreateAnswer", function() { return shimCreateAnswer; });
+
+// NAMESPACE OBJECT: ./node_modules/webrtc-adapter/src/js/safari/safari_shim.js
 var safari_shim_namespaceObject = {};
 __webpack_require__.r(safari_shim_namespaceObject);
 __webpack_require__.d(safari_shim_namespaceObject, "shimLocalStreamsAPI", function() { return shimLocalStreamsAPI; });
@@ -2844,6 +2972,9 @@ __webpack_require__.d(safari_shim_namespaceObject, "shimConstraints", function()
 __webpack_require__.d(safari_shim_namespaceObject, "shimRTCIceServerUrls", function() { return shimRTCIceServerUrls; });
 __webpack_require__.d(safari_shim_namespaceObject, "shimTrackEventTransceiver", function() { return shimTrackEventTransceiver; });
 __webpack_require__.d(safari_shim_namespaceObject, "shimCreateOfferLegacy", function() { return shimCreateOfferLegacy; });
+__webpack_require__.d(safari_shim_namespaceObject, "shimAudioContext", function() { return shimAudioContext; });
+
+// NAMESPACE OBJECT: ./node_modules/webrtc-adapter/src/js/common_shim.js
 var common_shim_namespaceObject = {};
 __webpack_require__.r(common_shim_namespaceObject);
 __webpack_require__.d(common_shim_namespaceObject, "shimRTCIceCandidate", function() { return shimRTCIceCandidate; });
@@ -2895,11 +3026,18 @@ function wrapPeerConnectionEvent(window, eventNameToWrap, wrapper) {
     const wrappedCallback = (e) => {
       const modifiedEvent = wrapper(e);
       if (modifiedEvent) {
-        cb(modifiedEvent);
+        if (cb.handleEvent) {
+          cb.handleEvent(modifiedEvent);
+        } else {
+          cb(modifiedEvent);
+        }
       }
     };
     this._eventMap = this._eventMap || {};
-    this._eventMap[cb] = wrappedCallback;
+    if (!this._eventMap[eventNameToWrap]) {
+      this._eventMap[eventNameToWrap] = new Map();
+    }
+    this._eventMap[eventNameToWrap].set(cb, wrappedCallback);
     return nativeAddEventListener.apply(this, [nativeEventName,
       wrappedCallback]);
   };
@@ -2907,11 +3045,20 @@ function wrapPeerConnectionEvent(window, eventNameToWrap, wrapper) {
   const nativeRemoveEventListener = proto.removeEventListener;
   proto.removeEventListener = function(nativeEventName, cb) {
     if (nativeEventName !== eventNameToWrap || !this._eventMap
-        || !this._eventMap[cb]) {
+        || !this._eventMap[eventNameToWrap]) {
       return nativeRemoveEventListener.apply(this, arguments);
     }
-    const unwrappedCb = this._eventMap[cb];
-    delete this._eventMap[cb];
+    if (!this._eventMap[eventNameToWrap].has(cb)) {
+      return nativeRemoveEventListener.apply(this, arguments);
+    }
+    const unwrappedCb = this._eventMap[eventNameToWrap].get(cb);
+    this._eventMap[eventNameToWrap].delete(cb);
+    if (this._eventMap[eventNameToWrap].size === 0) {
+      delete this._eventMap[eventNameToWrap];
+    }
+    if (Object.keys(this._eventMap).length === 0) {
+      delete this._eventMap;
+    }
     return nativeRemoveEventListener.apply(this, [nativeEventName,
       unwrappedCb]);
   };
@@ -3003,9 +3150,13 @@ function detectBrowser(window) {
     result.browser = 'firefox';
     result.version = extractVersion(navigator.userAgent,
         /Firefox\/(\d+)\./, 1);
-  } else if (navigator.webkitGetUserMedia) {
+  } else if (navigator.webkitGetUserMedia ||
+      (window.isSecureContext === false && window.webkitRTCPeerConnection &&
+       !window.RTCIceGatherer)) {
     // Chrome, Chromium, Webview, Opera.
     // Version matches Chrome/WebRTC version.
+    // Chrome 74 removed webkitGetUserMedia on http as well so we need the
+    // more complicated fallback to webkitRTCPeerConnection.
     result.browser = 'chrome';
     result.version = extractVersion(navigator.userAgent,
         /Chrom(e|ium)\/(\d+)\./, 2);
@@ -3019,6 +3170,8 @@ function detectBrowser(window) {
     result.browser = 'safari';
     result.version = extractVersion(navigator.userAgent,
         /AppleWebKit\/(\d+)\./, 1);
+    result.supportsUnifiedPlan = window.RTCRtpTransceiver &&
+        'currentDirection' in window.RTCRtpTransceiver.prototype;
   } else { // Default fallthrough: not supported.
     result.browser = 'Not a supported browser.';
     return result;
@@ -3028,26 +3181,77 @@ function detectBrowser(window) {
 }
 
 /**
+ * Checks if something is an object.
+ *
+ * @param {*} val The something you want to check.
+ * @return true if val is an object, false otherwise.
+ */
+function isObject(val) {
+  return Object.prototype.toString.call(val) === '[object Object]';
+}
+
+/**
  * Remove all empty objects and undefined values
  * from a nested object -- an enhanced and vanilla version
  * of Lodash's `compact`.
  */
 function compactObject(data) {
-  if (typeof data !== 'object') {
+  if (!isObject(data)) {
     return data;
   }
 
   return Object.keys(data).reduce(function(accumulator, key) {
-    const isObject = typeof data[key] === 'object';
-    const value = isObject ? compactObject(data[key]) : data[key];
-    const isEmptyObject = isObject && !Object.keys(value).length;
+    const isObj = isObject(data[key]);
+    const value = isObj ? compactObject(data[key]) : data[key];
+    const isEmptyObject = isObj && !Object.keys(value).length;
     if (value === undefined || isEmptyObject) {
       return accumulator;
     }
-
     return Object.assign(accumulator, {[key]: value});
   }, {});
 }
+
+/* iterates the stats graph recursively. */
+function walkStats(stats, base, resultSet) {
+  if (!base || resultSet.has(base.id)) {
+    return;
+  }
+  resultSet.set(base.id, base);
+  Object.keys(base).forEach(name => {
+    if (name.endsWith('Id')) {
+      walkStats(stats, stats.get(base[name]), resultSet);
+    } else if (name.endsWith('Ids')) {
+      base[name].forEach(id => {
+        walkStats(stats, stats.get(id), resultSet);
+      });
+    }
+  });
+}
+
+/* filter getStats for a sender/receiver track. */
+function filterStats(result, track, outbound) {
+  const streamStatsType = outbound ? 'outbound-rtp' : 'inbound-rtp';
+  const filteredResult = new Map();
+  if (track === null) {
+    return filteredResult;
+  }
+  const trackStats = [];
+  result.forEach(value => {
+    if (value.type === 'track' &&
+        value.trackIdentifier === track.id) {
+      trackStats.push(value);
+    }
+  });
+  trackStats.forEach(trackStat => {
+    result.forEach(stats => {
+      if (stats.type === streamStatsType && stats.trackId === trackStat.id) {
+        walkStats(result, stats, filteredResult);
+      }
+    });
+  });
+  return filteredResult;
+}
+
 
 // CONCATENATED MODULE: ./node_modules/webrtc-adapter/src/js/chrome/getusermedia.js
 /*
@@ -3223,20 +3427,22 @@ function shimGetUserMedia(window) {
   // Even though Chrome 45 has navigator.mediaDevices and a getUserMedia
   // function which returns a Promise, it does not accept spec-style
   // constraints.
-  const origGetUserMedia = navigator.mediaDevices.getUserMedia.
-      bind(navigator.mediaDevices);
-  navigator.mediaDevices.getUserMedia = function(cs) {
-    return shimConstraints_(cs, c => origGetUserMedia(c).then(stream => {
-      if (c.audio && !stream.getAudioTracks().length ||
-          c.video && !stream.getVideoTracks().length) {
-        stream.getTracks().forEach(track => {
-          track.stop();
-        });
-        throw new DOMException('', 'NotFoundError');
-      }
-      return stream;
-    }, e => Promise.reject(shimError_(e))));
-  };
+  if (navigator.mediaDevices.getUserMedia) {
+    const origGetUserMedia = navigator.mediaDevices.getUserMedia.
+        bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = function(cs) {
+      return shimConstraints_(cs, c => origGetUserMedia(c).then(stream => {
+        if (c.audio && !stream.getAudioTracks().length ||
+            c.video && !stream.getVideoTracks().length) {
+          stream.getTracks().forEach(track => {
+            track.stop();
+          });
+          throw new DOMException('', 'NotFoundError');
+        }
+        return stream;
+      }, e => Promise.reject(shimError_(e))));
+    };
+  }
 }
 
 // CONCATENATED MODULE: ./node_modules/webrtc-adapter/src/js/chrome/getdisplaymedia.js
@@ -3264,33 +3470,34 @@ function shimGetDisplayMedia(window, getSourceId) {
         'a function');
     return;
   }
-  window.navigator.mediaDevices.getDisplayMedia = function(constraints) {
-    return getSourceId(constraints)
-      .then(sourceId => {
-        const widthSpecified = constraints.video && constraints.video.width;
-        const heightSpecified = constraints.video && constraints.video.height;
-        const frameRateSpecified = constraints.video &&
-          constraints.video.frameRate;
-        constraints.video = {
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: sourceId,
-            maxFrameRate: frameRateSpecified || 3
+  window.navigator.mediaDevices.getDisplayMedia =
+    function getDisplayMedia(constraints) {
+      return getSourceId(constraints)
+        .then(sourceId => {
+          const widthSpecified = constraints.video && constraints.video.width;
+          const heightSpecified = constraints.video &&
+            constraints.video.height;
+          const frameRateSpecified = constraints.video &&
+            constraints.video.frameRate;
+          constraints.video = {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId,
+              maxFrameRate: frameRateSpecified || 3
+            }
+          };
+          if (widthSpecified) {
+            constraints.video.mandatory.maxWidth = widthSpecified;
           }
-        };
-        if (widthSpecified) {
-          constraints.video.mandatory.maxWidth = widthSpecified;
-        }
-        if (heightSpecified) {
-          constraints.video.mandatory.maxHeight = heightSpecified;
-        }
-        return window.navigator.mediaDevices.getUserMedia(constraints);
-      });
-  };
+          if (heightSpecified) {
+            constraints.video.mandatory.maxHeight = heightSpecified;
+          }
+          return window.navigator.mediaDevices.getUserMedia(constraints);
+        });
+    };
 }
 
 // CONCATENATED MODULE: ./node_modules/webrtc-adapter/src/js/chrome/chrome_shim.js
-
 /*
  *  Copyright (c) 2016 The WebRTC project authors. All Rights Reserved.
  *
@@ -3301,47 +3508,6 @@ function shimGetDisplayMedia(window, getSourceId) {
  /* eslint-env node */
 
 
-
-/* iterates the stats graph recursively. */
-function walkStats(stats, base, resultSet) {
-  if (!base || resultSet.has(base.id)) {
-    return;
-  }
-  resultSet.set(base.id, base);
-  Object.keys(base).forEach(name => {
-    if (name.endsWith('Id')) {
-      walkStats(stats, stats.get(base[name]), resultSet);
-    } else if (name.endsWith('Ids')) {
-      base[name].forEach(id => {
-        walkStats(stats, stats.get(id), resultSet);
-      });
-    }
-  });
-}
-
-/* filter getStats for a sender/receiver track. */
-function filterStats(result, track, outbound) {
-  const streamStatsType = outbound ? 'outbound-rtp' : 'inbound-rtp';
-  const filteredResult = new Map();
-  if (track === null) {
-    return filteredResult;
-  }
-  const trackStats = [];
-  result.forEach(value => {
-    if (value.type === 'track' &&
-        value.trackIdentifier === track.id) {
-      trackStats.push(value);
-    }
-  });
-  trackStats.forEach(trackStat => {
-    result.forEach(stats => {
-      if (stats.type === streamStatsType && stats.trackId === trackStat.id) {
-        walkStats(result, stats, filteredResult);
-      }
-    });
-  });
-  return filteredResult;
-}
 
 
 
@@ -3368,47 +3534,48 @@ function shimOnTrack(window) {
     });
     const origSetRemoteDescription =
         window.RTCPeerConnection.prototype.setRemoteDescription;
-    window.RTCPeerConnection.prototype.setRemoteDescription = function() {
-      if (!this._ontrackpoly) {
-        this._ontrackpoly = (e) => {
-          // onaddstream does not fire when a track is added to an existing
-          // stream. But stream.onaddtrack is implemented so we use that.
-          e.stream.addEventListener('addtrack', te => {
-            let receiver;
-            if (window.RTCPeerConnection.prototype.getReceivers) {
-              receiver = this.getReceivers()
-                .find(r => r.track && r.track.id === te.track.id);
-            } else {
-              receiver = {track: te.track};
-            }
+    window.RTCPeerConnection.prototype.setRemoteDescription =
+      function setRemoteDescription() {
+        if (!this._ontrackpoly) {
+          this._ontrackpoly = (e) => {
+            // onaddstream does not fire when a track is added to an existing
+            // stream. But stream.onaddtrack is implemented so we use that.
+            e.stream.addEventListener('addtrack', te => {
+              let receiver;
+              if (window.RTCPeerConnection.prototype.getReceivers) {
+                receiver = this.getReceivers()
+                  .find(r => r.track && r.track.id === te.track.id);
+              } else {
+                receiver = {track: te.track};
+              }
 
-            const event = new Event('track');
-            event.track = te.track;
-            event.receiver = receiver;
-            event.transceiver = {receiver};
-            event.streams = [e.stream];
-            this.dispatchEvent(event);
-          });
-          e.stream.getTracks().forEach(track => {
-            let receiver;
-            if (window.RTCPeerConnection.prototype.getReceivers) {
-              receiver = this.getReceivers()
-                .find(r => r.track && r.track.id === track.id);
-            } else {
-              receiver = {track};
-            }
-            const event = new Event('track');
-            event.track = track;
-            event.receiver = receiver;
-            event.transceiver = {receiver};
-            event.streams = [e.stream];
-            this.dispatchEvent(event);
-          });
-        };
-        this.addEventListener('addstream', this._ontrackpoly);
-      }
-      return origSetRemoteDescription.apply(this, arguments);
-    };
+              const event = new Event('track');
+              event.track = te.track;
+              event.receiver = receiver;
+              event.transceiver = {receiver};
+              event.streams = [e.stream];
+              this.dispatchEvent(event);
+            });
+            e.stream.getTracks().forEach(track => {
+              let receiver;
+              if (window.RTCPeerConnection.prototype.getReceivers) {
+                receiver = this.getReceivers()
+                  .find(r => r.track && r.track.id === track.id);
+              } else {
+                receiver = {track};
+              }
+              const event = new Event('track');
+              event.track = track;
+              event.receiver = receiver;
+              event.transceiver = {receiver};
+              event.streams = [e.stream];
+              this.dispatchEvent(event);
+            });
+          };
+          this.addEventListener('addstream', this._ontrackpoly);
+        }
+        return origSetRemoteDescription.apply(this, arguments);
+      };
   } else {
     // even if RTCRtpTransceiver is in window, it is only used and
     // emitted in unified-plan. Unfortunately this means we need
@@ -3447,31 +3614,33 @@ function shimGetSendersWithDtmf(window) {
 
     // augment addTrack when getSenders is not available.
     if (!window.RTCPeerConnection.prototype.getSenders) {
-      window.RTCPeerConnection.prototype.getSenders = function() {
+      window.RTCPeerConnection.prototype.getSenders = function getSenders() {
         this._senders = this._senders || [];
         return this._senders.slice(); // return a copy of the internal state.
       };
       const origAddTrack = window.RTCPeerConnection.prototype.addTrack;
-      window.RTCPeerConnection.prototype.addTrack = function(track, stream) {
-        let sender = origAddTrack.apply(this, arguments);
-        if (!sender) {
-          sender = shimSenderWithDtmf(this, track);
-          this._senders.push(sender);
-        }
-        return sender;
-      };
+      window.RTCPeerConnection.prototype.addTrack =
+        function addTrack(track, stream) {
+          let sender = origAddTrack.apply(this, arguments);
+          if (!sender) {
+            sender = shimSenderWithDtmf(this, track);
+            this._senders.push(sender);
+          }
+          return sender;
+        };
 
       const origRemoveTrack = window.RTCPeerConnection.prototype.removeTrack;
-      window.RTCPeerConnection.prototype.removeTrack = function(sender) {
-        origRemoveTrack.apply(this, arguments);
-        const idx = this._senders.indexOf(sender);
-        if (idx !== -1) {
-          this._senders.splice(idx, 1);
-        }
-      };
+      window.RTCPeerConnection.prototype.removeTrack =
+        function removeTrack(sender) {
+          origRemoveTrack.apply(this, arguments);
+          const idx = this._senders.indexOf(sender);
+          if (idx !== -1) {
+            this._senders.splice(idx, 1);
+          }
+        };
     }
     const origAddStream = window.RTCPeerConnection.prototype.addStream;
-    window.RTCPeerConnection.prototype.addStream = function(stream) {
+    window.RTCPeerConnection.prototype.addStream = function addStream(stream) {
       this._senders = this._senders || [];
       origAddStream.apply(this, [stream]);
       stream.getTracks().forEach(track => {
@@ -3480,24 +3649,25 @@ function shimGetSendersWithDtmf(window) {
     };
 
     const origRemoveStream = window.RTCPeerConnection.prototype.removeStream;
-    window.RTCPeerConnection.prototype.removeStream = function(stream) {
-      this._senders = this._senders || [];
-      origRemoveStream.apply(this, [stream]);
+    window.RTCPeerConnection.prototype.removeStream =
+      function removeStream(stream) {
+        this._senders = this._senders || [];
+        origRemoveStream.apply(this, [stream]);
 
-      stream.getTracks().forEach(track => {
-        const sender = this._senders.find(s => s.track === track);
-        if (sender) { // remove sender
-          this._senders.splice(this._senders.indexOf(sender), 1);
-        }
-      });
-    };
+        stream.getTracks().forEach(track => {
+          const sender = this._senders.find(s => s.track === track);
+          if (sender) { // remove sender
+            this._senders.splice(this._senders.indexOf(sender), 1);
+          }
+        });
+      };
   } else if (typeof window === 'object' && window.RTCPeerConnection &&
              'getSenders' in window.RTCPeerConnection.prototype &&
              'createDTMFSender' in window.RTCPeerConnection.prototype &&
              window.RTCRtpSender &&
              !('dtmf' in window.RTCRtpSender.prototype)) {
     const origGetSenders = window.RTCPeerConnection.prototype.getSenders;
-    window.RTCPeerConnection.prototype.getSenders = function() {
+    window.RTCPeerConnection.prototype.getSenders = function getSenders() {
       const senders = origGetSenders.apply(this, []);
       senders.forEach(sender => sender._pc = this);
       return senders;
@@ -3518,6 +3688,73 @@ function shimGetSendersWithDtmf(window) {
   }
 }
 
+function shimGetStats(window) {
+  if (!window.RTCPeerConnection) {
+    return;
+  }
+
+  const origGetStats = window.RTCPeerConnection.prototype.getStats;
+  window.RTCPeerConnection.prototype.getStats = function getStats() {
+    const [selector, onSucc, onErr] = arguments;
+
+    // If selector is a function then we are in the old style stats so just
+    // pass back the original getStats format to avoid breaking old users.
+    if (arguments.length > 0 && typeof selector === 'function') {
+      return origGetStats.apply(this, arguments);
+    }
+
+    // When spec-style getStats is supported, return those when called with
+    // either no arguments or the selector argument is null.
+    if (origGetStats.length === 0 && (arguments.length === 0 ||
+        typeof selector !== 'function')) {
+      return origGetStats.apply(this, []);
+    }
+
+    const fixChromeStats_ = function(response) {
+      const standardReport = {};
+      const reports = response.result();
+      reports.forEach(report => {
+        const standardStats = {
+          id: report.id,
+          timestamp: report.timestamp,
+          type: {
+            localcandidate: 'local-candidate',
+            remotecandidate: 'remote-candidate'
+          }[report.type] || report.type
+        };
+        report.names().forEach(name => {
+          standardStats[name] = report.stat(name);
+        });
+        standardReport[standardStats.id] = standardStats;
+      });
+
+      return standardReport;
+    };
+
+    // shim getStats with maplike support
+    const makeMapStats = function(stats) {
+      return new Map(Object.keys(stats).map(key => [key, stats[key]]));
+    };
+
+    if (arguments.length >= 2) {
+      const successCallbackWrapper_ = function(response) {
+        onSucc(makeMapStats(fixChromeStats_(response)));
+      };
+
+      return origGetStats.apply(this, [successCallbackWrapper_,
+        selector]);
+    }
+
+    // promise-support
+    return new Promise((resolve, reject) => {
+      origGetStats.apply(this, [
+        function(response) {
+          resolve(makeMapStats(fixChromeStats_(response)));
+        }, reject]);
+    }).then(onSucc, onErr);
+  };
+}
+
 function shimSenderReceiverGetStats(window) {
   if (!(typeof window === 'object' && window.RTCPeerConnection &&
       window.RTCRtpSender && window.RTCRtpReceiver)) {
@@ -3528,7 +3765,7 @@ function shimSenderReceiverGetStats(window) {
   if (!('getStats' in window.RTCRtpSender.prototype)) {
     const origGetSenders = window.RTCPeerConnection.prototype.getSenders;
     if (origGetSenders) {
-      window.RTCPeerConnection.prototype.getSenders = function() {
+      window.RTCPeerConnection.prototype.getSenders = function getSenders() {
         const senders = origGetSenders.apply(this, []);
         senders.forEach(sender => sender._pc = this);
         return senders;
@@ -3537,13 +3774,13 @@ function shimSenderReceiverGetStats(window) {
 
     const origAddTrack = window.RTCPeerConnection.prototype.addTrack;
     if (origAddTrack) {
-      window.RTCPeerConnection.prototype.addTrack = function() {
+      window.RTCPeerConnection.prototype.addTrack = function addTrack() {
         const sender = origAddTrack.apply(this, arguments);
         sender._pc = this;
         return sender;
       };
     }
-    window.RTCRtpSender.prototype.getStats = function() {
+    window.RTCRtpSender.prototype.getStats = function getStats() {
       const sender = this;
       return this._pc.getStats().then(result =>
         /* Note: this will include stats of all senders that
@@ -3558,17 +3795,18 @@ function shimSenderReceiverGetStats(window) {
   if (!('getStats' in window.RTCRtpReceiver.prototype)) {
     const origGetReceivers = window.RTCPeerConnection.prototype.getReceivers;
     if (origGetReceivers) {
-      window.RTCPeerConnection.prototype.getReceivers = function() {
-        const receivers = origGetReceivers.apply(this, []);
-        receivers.forEach(receiver => receiver._pc = this);
-        return receivers;
-      };
+      window.RTCPeerConnection.prototype.getReceivers =
+        function getReceivers() {
+          const receivers = origGetReceivers.apply(this, []);
+          receivers.forEach(receiver => receiver._pc = this);
+          return receivers;
+        };
     }
     wrapPeerConnectionEvent(window, 'track', e => {
       e.receiver._pc = e.srcElement;
       return e;
     });
-    window.RTCRtpReceiver.prototype.getStats = function() {
+    window.RTCRtpReceiver.prototype.getStats = function getStats() {
       const receiver = this;
       return this._pc.getStats().then(result =>
         filterStats(result, receiver.track, false));
@@ -3582,7 +3820,7 @@ function shimSenderReceiverGetStats(window) {
 
   // shim RTCPeerConnection.getStats(track).
   const origGetStats = window.RTCPeerConnection.prototype.getStats;
-  window.RTCPeerConnection.prototype.getStats = function() {
+  window.RTCPeerConnection.prototype.getStats = function getStats() {
     if (arguments.length > 0 &&
         arguments[0] instanceof window.MediaStreamTrack) {
       const track = arguments[0];
@@ -3629,30 +3867,32 @@ function shimAddTrackRemoveTrackWithNative(window) {
   // shim addTrack/removeTrack with native variants in order to make
   // the interactions with legacy getLocalStreams behave as in other browsers.
   // Keeps a mapping stream.id => [stream, rtpsenders...]
-  window.RTCPeerConnection.prototype.getLocalStreams = function() {
-    this._shimmedLocalStreams = this._shimmedLocalStreams || {};
-    return Object.keys(this._shimmedLocalStreams)
-      .map(streamId => this._shimmedLocalStreams[streamId][0]);
-  };
+  window.RTCPeerConnection.prototype.getLocalStreams =
+    function getLocalStreams() {
+      this._shimmedLocalStreams = this._shimmedLocalStreams || {};
+      return Object.keys(this._shimmedLocalStreams)
+        .map(streamId => this._shimmedLocalStreams[streamId][0]);
+    };
 
   const origAddTrack = window.RTCPeerConnection.prototype.addTrack;
-  window.RTCPeerConnection.prototype.addTrack = function(track, stream) {
-    if (!stream) {
-      return origAddTrack.apply(this, arguments);
-    }
-    this._shimmedLocalStreams = this._shimmedLocalStreams || {};
+  window.RTCPeerConnection.prototype.addTrack =
+    function addTrack(track, stream) {
+      if (!stream) {
+        return origAddTrack.apply(this, arguments);
+      }
+      this._shimmedLocalStreams = this._shimmedLocalStreams || {};
 
-    const sender = origAddTrack.apply(this, arguments);
-    if (!this._shimmedLocalStreams[stream.id]) {
-      this._shimmedLocalStreams[stream.id] = [stream, sender];
-    } else if (this._shimmedLocalStreams[stream.id].indexOf(sender) === -1) {
-      this._shimmedLocalStreams[stream.id].push(sender);
-    }
-    return sender;
-  };
+      const sender = origAddTrack.apply(this, arguments);
+      if (!this._shimmedLocalStreams[stream.id]) {
+        this._shimmedLocalStreams[stream.id] = [stream, sender];
+      } else if (this._shimmedLocalStreams[stream.id].indexOf(sender) === -1) {
+        this._shimmedLocalStreams[stream.id].push(sender);
+      }
+      return sender;
+    };
 
   const origAddStream = window.RTCPeerConnection.prototype.addStream;
-  window.RTCPeerConnection.prototype.addStream = function(stream) {
+  window.RTCPeerConnection.prototype.addStream = function addStream(stream) {
     this._shimmedLocalStreams = this._shimmedLocalStreams || {};
 
     stream.getTracks().forEach(track => {
@@ -3670,28 +3910,30 @@ function shimAddTrackRemoveTrackWithNative(window) {
   };
 
   const origRemoveStream = window.RTCPeerConnection.prototype.removeStream;
-  window.RTCPeerConnection.prototype.removeStream = function(stream) {
-    this._shimmedLocalStreams = this._shimmedLocalStreams || {};
-    delete this._shimmedLocalStreams[stream.id];
-    return origRemoveStream.apply(this, arguments);
-  };
+  window.RTCPeerConnection.prototype.removeStream =
+    function removeStream(stream) {
+      this._shimmedLocalStreams = this._shimmedLocalStreams || {};
+      delete this._shimmedLocalStreams[stream.id];
+      return origRemoveStream.apply(this, arguments);
+    };
 
   const origRemoveTrack = window.RTCPeerConnection.prototype.removeTrack;
-  window.RTCPeerConnection.prototype.removeTrack = function(sender) {
-    this._shimmedLocalStreams = this._shimmedLocalStreams || {};
-    if (sender) {
-      Object.keys(this._shimmedLocalStreams).forEach(streamId => {
-        const idx = this._shimmedLocalStreams[streamId].indexOf(sender);
-        if (idx !== -1) {
-          this._shimmedLocalStreams[streamId].splice(idx, 1);
-        }
-        if (this._shimmedLocalStreams[streamId].length === 1) {
-          delete this._shimmedLocalStreams[streamId];
-        }
-      });
-    }
-    return origRemoveTrack.apply(this, arguments);
-  };
+  window.RTCPeerConnection.prototype.removeTrack =
+    function removeTrack(sender) {
+      this._shimmedLocalStreams = this._shimmedLocalStreams || {};
+      if (sender) {
+        Object.keys(this._shimmedLocalStreams).forEach(streamId => {
+          const idx = this._shimmedLocalStreams[streamId].indexOf(sender);
+          if (idx !== -1) {
+            this._shimmedLocalStreams[streamId].splice(idx, 1);
+          }
+          if (this._shimmedLocalStreams[streamId].length === 1) {
+            delete this._shimmedLocalStreams[streamId];
+          }
+        });
+      }
+      return origRemoveTrack.apply(this, arguments);
+    };
 }
 
 function shimAddTrackRemoveTrack(window) {
@@ -3709,14 +3951,15 @@ function shimAddTrackRemoveTrack(window) {
   // to return the original streams.
   const origGetLocalStreams = window.RTCPeerConnection.prototype
       .getLocalStreams;
-  window.RTCPeerConnection.prototype.getLocalStreams = function() {
-    const nativeStreams = origGetLocalStreams.apply(this);
-    this._reverseStreams = this._reverseStreams || {};
-    return nativeStreams.map(stream => this._reverseStreams[stream.id]);
-  };
+  window.RTCPeerConnection.prototype.getLocalStreams =
+    function getLocalStreams() {
+      const nativeStreams = origGetLocalStreams.apply(this);
+      this._reverseStreams = this._reverseStreams || {};
+      return nativeStreams.map(stream => this._reverseStreams[stream.id]);
+    };
 
   const origAddStream = window.RTCPeerConnection.prototype.addStream;
-  window.RTCPeerConnection.prototype.addStream = function(stream) {
+  window.RTCPeerConnection.prototype.addStream = function addStream(stream) {
     this._streams = this._streams || {};
     this._reverseStreams = this._reverseStreams || {};
 
@@ -3739,61 +3982,63 @@ function shimAddTrackRemoveTrack(window) {
   };
 
   const origRemoveStream = window.RTCPeerConnection.prototype.removeStream;
-  window.RTCPeerConnection.prototype.removeStream = function(stream) {
-    this._streams = this._streams || {};
-    this._reverseStreams = this._reverseStreams || {};
+  window.RTCPeerConnection.prototype.removeStream =
+    function removeStream(stream) {
+      this._streams = this._streams || {};
+      this._reverseStreams = this._reverseStreams || {};
 
-    origRemoveStream.apply(this, [(this._streams[stream.id] || stream)]);
-    delete this._reverseStreams[(this._streams[stream.id] ?
-        this._streams[stream.id].id : stream.id)];
-    delete this._streams[stream.id];
-  };
+      origRemoveStream.apply(this, [(this._streams[stream.id] || stream)]);
+      delete this._reverseStreams[(this._streams[stream.id] ?
+          this._streams[stream.id].id : stream.id)];
+      delete this._streams[stream.id];
+    };
 
-  window.RTCPeerConnection.prototype.addTrack = function(track, stream) {
-    if (this.signalingState === 'closed') {
-      throw new DOMException(
-        'The RTCPeerConnection\'s signalingState is \'closed\'.',
-        'InvalidStateError');
-    }
-    const streams = [].slice.call(arguments, 1);
-    if (streams.length !== 1 ||
-        !streams[0].getTracks().find(t => t === track)) {
-      // this is not fully correct but all we can manage without
-      // [[associated MediaStreams]] internal slot.
-      throw new DOMException(
-        'The adapter.js addTrack polyfill only supports a single ' +
-        ' stream which is associated with the specified track.',
-        'NotSupportedError');
-    }
+  window.RTCPeerConnection.prototype.addTrack =
+    function addTrack(track, stream) {
+      if (this.signalingState === 'closed') {
+        throw new DOMException(
+          'The RTCPeerConnection\'s signalingState is \'closed\'.',
+          'InvalidStateError');
+      }
+      const streams = [].slice.call(arguments, 1);
+      if (streams.length !== 1 ||
+          !streams[0].getTracks().find(t => t === track)) {
+        // this is not fully correct but all we can manage without
+        // [[associated MediaStreams]] internal slot.
+        throw new DOMException(
+          'The adapter.js addTrack polyfill only supports a single ' +
+          ' stream which is associated with the specified track.',
+          'NotSupportedError');
+      }
 
-    const alreadyExists = this.getSenders().find(s => s.track === track);
-    if (alreadyExists) {
-      throw new DOMException('Track already exists.',
-          'InvalidAccessError');
-    }
+      const alreadyExists = this.getSenders().find(s => s.track === track);
+      if (alreadyExists) {
+        throw new DOMException('Track already exists.',
+            'InvalidAccessError');
+      }
 
-    this._streams = this._streams || {};
-    this._reverseStreams = this._reverseStreams || {};
-    const oldStream = this._streams[stream.id];
-    if (oldStream) {
-      // this is using odd Chrome behaviour, use with caution:
-      // https://bugs.chromium.org/p/webrtc/issues/detail?id=7815
-      // Note: we rely on the high-level addTrack/dtmf shim to
-      // create the sender with a dtmf sender.
-      oldStream.addTrack(track);
+      this._streams = this._streams || {};
+      this._reverseStreams = this._reverseStreams || {};
+      const oldStream = this._streams[stream.id];
+      if (oldStream) {
+        // this is using odd Chrome behaviour, use with caution:
+        // https://bugs.chromium.org/p/webrtc/issues/detail?id=7815
+        // Note: we rely on the high-level addTrack/dtmf shim to
+        // create the sender with a dtmf sender.
+        oldStream.addTrack(track);
 
-      // Trigger ONN async.
-      Promise.resolve().then(() => {
-        this.dispatchEvent(new Event('negotiationneeded'));
-      });
-    } else {
-      const newStream = new window.MediaStream([track]);
-      this._streams[stream.id] = newStream;
-      this._reverseStreams[newStream.id] = stream;
-      this.addStream(newStream);
-    }
-    return this.getSenders().find(s => s.track === track);
-  };
+        // Trigger ONN async.
+        Promise.resolve().then(() => {
+          this.dispatchEvent(new Event('negotiationneeded'));
+        });
+      } else {
+        const newStream = new window.MediaStream([track]);
+        this._streams[stream.id] = newStream;
+        this._reverseStreams[newStream.id] = stream;
+        this.addStream(newStream);
+      }
+      return this.getSenders().find(s => s.track === track);
+    };
 
   // replace the internal stream id with the external one and
   // vice versa.
@@ -3825,7 +4070,7 @@ function shimAddTrackRemoveTrack(window) {
   }
   ['createOffer', 'createAnswer'].forEach(function(method) {
     const nativeMethod = window.RTCPeerConnection.prototype[method];
-    window.RTCPeerConnection.prototype[method] = function() {
+    const methodObj = {[method]() {
       const args = arguments;
       const isLegacyCall = arguments.length &&
           typeof arguments[0] === 'function';
@@ -3844,18 +4089,20 @@ function shimAddTrackRemoveTrack(window) {
       }
       return nativeMethod.apply(this, arguments)
       .then(description => replaceInternalStreamId(this, description));
-    };
+    }};
+    window.RTCPeerConnection.prototype[method] = methodObj[method];
   });
 
   const origSetLocalDescription =
       window.RTCPeerConnection.prototype.setLocalDescription;
-  window.RTCPeerConnection.prototype.setLocalDescription = function() {
-    if (!arguments.length || !arguments[0].type) {
+  window.RTCPeerConnection.prototype.setLocalDescription =
+    function setLocalDescription() {
+      if (!arguments.length || !arguments[0].type) {
+        return origSetLocalDescription.apply(this, arguments);
+      }
+      arguments[0] = replaceExternalStreamId(this, arguments[0]);
       return origSetLocalDescription.apply(this, arguments);
-    }
-    arguments[0] = replaceExternalStreamId(this, arguments[0]);
-    return origSetLocalDescription.apply(this, arguments);
-  };
+    };
 
   // TODO: mangle getStats: https://w3c.github.io/webrtc-stats/#dom-rtcmediastreamstats-streamidentifier
 
@@ -3872,50 +4119,53 @@ function shimAddTrackRemoveTrack(window) {
         }
       });
 
-  window.RTCPeerConnection.prototype.removeTrack = function(sender) {
-    if (this.signalingState === 'closed') {
-      throw new DOMException(
-        'The RTCPeerConnection\'s signalingState is \'closed\'.',
-        'InvalidStateError');
-    }
-    // We can not yet check for sender instanceof RTCRtpSender
-    // since we shim RTPSender. So we check if sender._pc is set.
-    if (!sender._pc) {
-      throw new DOMException('Argument 1 of RTCPeerConnection.removeTrack ' +
-          'does not implement interface RTCRtpSender.', 'TypeError');
-    }
-    const isLocal = sender._pc === this;
-    if (!isLocal) {
-      throw new DOMException('Sender was not created by this connection.',
-          'InvalidAccessError');
-    }
-
-    // Search for the native stream the senders track belongs to.
-    this._streams = this._streams || {};
-    let stream;
-    Object.keys(this._streams).forEach(streamid => {
-      const hasTrack = this._streams[streamid].getTracks()
-        .find(track => sender.track === track);
-      if (hasTrack) {
-        stream = this._streams[streamid];
+  window.RTCPeerConnection.prototype.removeTrack =
+    function removeTrack(sender) {
+      if (this.signalingState === 'closed') {
+        throw new DOMException(
+          'The RTCPeerConnection\'s signalingState is \'closed\'.',
+          'InvalidStateError');
       }
-    });
-
-    if (stream) {
-      if (stream.getTracks().length === 1) {
-        // if this is the last track of the stream, remove the stream. This
-        // takes care of any shimmed _senders.
-        this.removeStream(this._reverseStreams[stream.id]);
-      } else {
-        // relying on the same odd chrome behaviour as above.
-        stream.removeTrack(sender.track);
+      // We can not yet check for sender instanceof RTCRtpSender
+      // since we shim RTPSender. So we check if sender._pc is set.
+      if (!sender._pc) {
+        throw new DOMException('Argument 1 of RTCPeerConnection.removeTrack ' +
+            'does not implement interface RTCRtpSender.', 'TypeError');
       }
-      this.dispatchEvent(new Event('negotiationneeded'));
-    }
-  };
+      const isLocal = sender._pc === this;
+      if (!isLocal) {
+        throw new DOMException('Sender was not created by this connection.',
+            'InvalidAccessError');
+      }
+
+      // Search for the native stream the senders track belongs to.
+      this._streams = this._streams || {};
+      let stream;
+      Object.keys(this._streams).forEach(streamid => {
+        const hasTrack = this._streams[streamid].getTracks()
+          .find(track => sender.track === track);
+        if (hasTrack) {
+          stream = this._streams[streamid];
+        }
+      });
+
+      if (stream) {
+        if (stream.getTracks().length === 1) {
+          // if this is the last track of the stream, remove the stream. This
+          // takes care of any shimmed _senders.
+          this.removeStream(this._reverseStreams[stream.id]);
+        } else {
+          // relying on the same odd chrome behaviour as above.
+          stream.removeTrack(sender.track);
+        }
+        this.dispatchEvent(new Event('negotiationneeded'));
+      }
+    };
 }
 
 function shimPeerConnection(window) {
+  const browserDetails = detectBrowser(window);
+
   if (!window.RTCPeerConnection && window.webkitRTCPeerConnection) {
     // very basic support for old versions.
     window.RTCPeerConnection = window.webkitRTCPeerConnection;
@@ -3924,99 +4174,55 @@ function shimPeerConnection(window) {
     return;
   }
 
-  const origGetStats = window.RTCPeerConnection.prototype.getStats;
-  window.RTCPeerConnection.prototype.getStats = function(selector,
-      successCallback, errorCallback) {
-    const args = arguments;
-
-    // If selector is a function then we are in the old style stats so just
-    // pass back the original getStats format to avoid breaking old users.
-    if (arguments.length > 0 && typeof selector === 'function') {
-      return origGetStats.apply(this, arguments);
-    }
-
-    // When spec-style getStats is supported, return those when called with
-    // either no arguments or the selector argument is null.
-    if (origGetStats.length === 0 && (arguments.length === 0 ||
-        typeof arguments[0] !== 'function')) {
-      return origGetStats.apply(this, []);
-    }
-
-    const fixChromeStats_ = function(response) {
-      const standardReport = {};
-      const reports = response.result();
-      reports.forEach(report => {
-        const standardStats = {
-          id: report.id,
-          timestamp: report.timestamp,
-          type: {
-            localcandidate: 'local-candidate',
-            remotecandidate: 'remote-candidate'
-          }[report.type] || report.type
-        };
-        report.names().forEach(name => {
-          standardStats[name] = report.stat(name);
-        });
-        standardReport[standardStats.id] = standardStats;
-      });
-
-      return standardReport;
-    };
-
-    // shim getStats with maplike support
-    const makeMapStats = function(stats) {
-      return new Map(Object.keys(stats).map(key => [key, stats[key]]));
-    };
-
-    if (arguments.length >= 2) {
-      const successCallbackWrapper_ = function(response) {
-        args[1](makeMapStats(fixChromeStats_(response)));
-      };
-
-      return origGetStats.apply(this, [successCallbackWrapper_,
-        arguments[0]]);
-    }
-
-    // promise-support
-    return new Promise((resolve, reject) => {
-      origGetStats.apply(this, [
-        function(response) {
-          resolve(makeMapStats(fixChromeStats_(response)));
-        }, reject]);
-    }).then(successCallback, errorCallback);
-  };
+  const addIceCandidateNullSupported =
+    window.RTCPeerConnection.prototype.addIceCandidate.length === 0;
 
   // shim implicit creation of RTCSessionDescription/RTCIceCandidate
-  ['setLocalDescription', 'setRemoteDescription', 'addIceCandidate']
-      .forEach(function(method) {
-        const nativeMethod = window.RTCPeerConnection.prototype[method];
-        window.RTCPeerConnection.prototype[method] = function() {
-          arguments[0] = new ((method === 'addIceCandidate') ?
-              window.RTCIceCandidate :
-              window.RTCSessionDescription)(arguments[0]);
-          return nativeMethod.apply(this, arguments);
-        };
-      });
+  if (browserDetails.version < 53) {
+    ['setLocalDescription', 'setRemoteDescription', 'addIceCandidate']
+        .forEach(function(method) {
+          const nativeMethod = window.RTCPeerConnection.prototype[method];
+          const methodObj = {[method]() {
+            arguments[0] = new ((method === 'addIceCandidate') ?
+                window.RTCIceCandidate :
+                window.RTCSessionDescription)(arguments[0]);
+            return nativeMethod.apply(this, arguments);
+          }};
+          window.RTCPeerConnection.prototype[method] = methodObj[method];
+        });
+  }
 
   // support for addIceCandidate(null or undefined)
   const nativeAddIceCandidate =
       window.RTCPeerConnection.prototype.addIceCandidate;
-  window.RTCPeerConnection.prototype.addIceCandidate = function() {
-    if (!arguments[0]) {
-      if (arguments[1]) {
-        arguments[1].apply(null);
+  window.RTCPeerConnection.prototype.addIceCandidate =
+    function addIceCandidate() {
+      if (!addIceCandidateNullSupported && !arguments[0]) {
+        if (arguments[1]) {
+          arguments[1].apply(null);
+        }
+        return Promise.resolve();
       }
-      return Promise.resolve();
-    }
-    return nativeAddIceCandidate.apply(this, arguments);
-  };
+      // Firefox 68+ emits and processes {candidate: "", ...}, ignore
+      // in older versions. Native support planned for Chrome M77.
+      if (browserDetails.version < 78 &&
+        arguments[0] && arguments[0].candidate === '') {
+        return Promise.resolve();
+      }
+      return nativeAddIceCandidate.apply(this, arguments);
+    };
 }
 
+// Attempt to fix ONN in plan-b mode.
 function fixNegotiationNeeded(window) {
+  const browserDetails = detectBrowser(window);
   wrapPeerConnectionEvent(window, 'negotiationneeded', e => {
     const pc = e.target;
-    if (pc.signalingState !== 'stable') {
-      return;
+    if (browserDetails.version < 72 || (pc.getConfiguration &&
+        pc.getConfiguration().sdpSemantics === 'plan-b')) {
+      if (pc.signalingState !== 'stable') {
+        return;
+      }
     }
     return e;
   });
@@ -4135,7 +4341,7 @@ function getdisplaymedia_shimGetDisplayMedia(window) {
     return;
   }
   window.navigator.mediaDevices.getDisplayMedia =
-    window.navigator.getDisplayMedia.bind(window.navigator.mediaDevices);
+    window.navigator.getDisplayMedia.bind(window.navigator);
 }
 
 // CONCATENATED MODULE: ./node_modules/webrtc-adapter/src/js/edge/edge_shim.js
@@ -4161,12 +4367,12 @@ function edge_shim_shimPeerConnection(window) {
 
   if (window.RTCIceGatherer) {
     if (!window.RTCIceCandidate) {
-      window.RTCIceCandidate = function(args) {
+      window.RTCIceCandidate = function RTCIceCandidate(args) {
         return args;
       };
     }
     if (!window.RTCSessionDescription) {
-      window.RTCSessionDescription = function(args) {
+      window.RTCSessionDescription = function RTCSessionDescription(args) {
         return args;
       };
     }
@@ -4211,7 +4417,7 @@ function edge_shim_shimPeerConnection(window) {
 
   const RTCPeerConnectionShim = rtcpeerconnection_default()(window,
       browserDetails.version);
-  window.RTCPeerConnection = function(config) {
+  window.RTCPeerConnection = function RTCPeerConnection(config) {
     if (config && config.iceServers) {
       config.iceServers = filterIceServers(config.iceServers,
         browserDetails.version);
@@ -4320,22 +4526,23 @@ function firefox_getdisplaymedia_shimGetDisplayMedia(window, preferredMediaSourc
   if (!(window.navigator.mediaDevices)) {
     return;
   }
-  window.navigator.mediaDevices.getDisplayMedia = function(constraints) {
-    if (!(constraints && constraints.video)) {
-      const err = new DOMException('getDisplayMedia without video ' +
-          'constraints is undefined');
-      err.name = 'NotFoundError';
-      // from https://heycam.github.io/webidl/#idl-DOMException-error-names
-      err.code = 8;
-      return Promise.reject(err);
-    }
-    if (constraints.video === true) {
-      constraints.video = {mediaSource: preferredMediaSource};
-    } else {
-      constraints.video.mediaSource = preferredMediaSource;
-    }
-    return window.navigator.mediaDevices.getUserMedia(constraints);
-  };
+  window.navigator.mediaDevices.getDisplayMedia =
+    function getDisplayMedia(constraints) {
+      if (!(constraints && constraints.video)) {
+        const err = new DOMException('getDisplayMedia without video ' +
+            'constraints is undefined');
+        err.name = 'NotFoundError';
+        // from https://heycam.github.io/webidl/#idl-DOMException-error-names
+        err.code = 8;
+        return Promise.reject(err);
+      }
+      if (constraints.video === true) {
+        constraints.video = {mediaSource: preferredMediaSource};
+      } else {
+        constraints.video.mediaSource = preferredMediaSource;
+      }
+      return window.navigator.mediaDevices.getUserMedia(constraints);
+    };
 }
 
 // CONCATENATED MODULE: ./node_modules/webrtc-adapter/src/js/firefox/firefox_shim.js
@@ -4377,30 +4584,42 @@ function firefox_shim_shimPeerConnection(window) {
     window.RTCPeerConnection = window.mozRTCPeerConnection;
   }
 
-  // shim away need for obsolete RTCIceCandidate/RTCSessionDescription.
-  ['setLocalDescription', 'setRemoteDescription', 'addIceCandidate']
-      .forEach(function(method) {
-        const nativeMethod = window.RTCPeerConnection.prototype[method];
-        window.RTCPeerConnection.prototype[method] = function() {
-          arguments[0] = new ((method === 'addIceCandidate') ?
-              window.RTCIceCandidate :
-              window.RTCSessionDescription)(arguments[0]);
-          return nativeMethod.apply(this, arguments);
-        };
-      });
+  if (browserDetails.version < 53) {
+    // shim away need for obsolete RTCIceCandidate/RTCSessionDescription.
+    ['setLocalDescription', 'setRemoteDescription', 'addIceCandidate']
+        .forEach(function(method) {
+          const nativeMethod = window.RTCPeerConnection.prototype[method];
+          const methodObj = {[method]() {
+            arguments[0] = new ((method === 'addIceCandidate') ?
+                window.RTCIceCandidate :
+                window.RTCSessionDescription)(arguments[0]);
+            return nativeMethod.apply(this, arguments);
+          }};
+          window.RTCPeerConnection.prototype[method] = methodObj[method];
+        });
+  }
 
   // support for addIceCandidate(null or undefined)
-  const nativeAddIceCandidate =
-      window.RTCPeerConnection.prototype.addIceCandidate;
-  window.RTCPeerConnection.prototype.addIceCandidate = function() {
-    if (!arguments[0]) {
-      if (arguments[1]) {
-        arguments[1].apply(null);
+  // as well as ignoring {sdpMid, candidate: ""}
+  if (browserDetails.version < 68) {
+    const nativeAddIceCandidate =
+        window.RTCPeerConnection.prototype.addIceCandidate;
+    window.RTCPeerConnection.prototype.addIceCandidate =
+    function addIceCandidate() {
+      if (!arguments[0]) {
+        if (arguments[1]) {
+          arguments[1].apply(null);
+        }
+        return Promise.resolve();
       }
-      return Promise.resolve();
-    }
-    return nativeAddIceCandidate.apply(this, arguments);
-  };
+      // Firefox 68+ emits and processes {candidate: "", ...}, ignore
+      // in older versions.
+      if (arguments[0] && arguments[0].candidate === '') {
+        return Promise.resolve();
+      }
+      return nativeAddIceCandidate.apply(this, arguments);
+    };
+  }
 
   const modernStatsTypes = {
     inboundrtp: 'inbound-rtp',
@@ -4411,11 +4630,8 @@ function firefox_shim_shimPeerConnection(window) {
   };
 
   const nativeGetStats = window.RTCPeerConnection.prototype.getStats;
-  window.RTCPeerConnection.prototype.getStats = function(
-    selector,
-    onSucc,
-    onErr
-  ) {
+  window.RTCPeerConnection.prototype.getStats = function getStats() {
+    const [selector, onSucc, onErr] = arguments;
     return nativeGetStats.apply(this, [selector || null])
       .then(stats => {
         if (browserDetails.version < 53 && !onSucc) {
@@ -4453,7 +4669,7 @@ function shimSenderGetStats(window) {
   }
   const origGetSenders = window.RTCPeerConnection.prototype.getSenders;
   if (origGetSenders) {
-    window.RTCPeerConnection.prototype.getSenders = function() {
+    window.RTCPeerConnection.prototype.getSenders = function getSenders() {
       const senders = origGetSenders.apply(this, []);
       senders.forEach(sender => sender._pc = this);
       return senders;
@@ -4462,13 +4678,13 @@ function shimSenderGetStats(window) {
 
   const origAddTrack = window.RTCPeerConnection.prototype.addTrack;
   if (origAddTrack) {
-    window.RTCPeerConnection.prototype.addTrack = function() {
+    window.RTCPeerConnection.prototype.addTrack = function addTrack() {
       const sender = origAddTrack.apply(this, arguments);
       sender._pc = this;
       return sender;
     };
   }
-  window.RTCRtpSender.prototype.getStats = function() {
+  window.RTCRtpSender.prototype.getStats = function getStats() {
     return this.track ? this._pc.getStats(this.track) :
         Promise.resolve(new Map());
   };
@@ -4484,7 +4700,7 @@ function shimReceiverGetStats(window) {
   }
   const origGetReceivers = window.RTCPeerConnection.prototype.getReceivers;
   if (origGetReceivers) {
-    window.RTCPeerConnection.prototype.getReceivers = function() {
+    window.RTCPeerConnection.prototype.getReceivers = function getReceivers() {
       const receivers = origGetReceivers.apply(this, []);
       receivers.forEach(receiver => receiver._pc = this);
       return receivers;
@@ -4494,7 +4710,7 @@ function shimReceiverGetStats(window) {
     e.receiver._pc = e.srcElement;
     return e;
   });
-  window.RTCRtpReceiver.prototype.getStats = function() {
+  window.RTCRtpReceiver.prototype.getStats = function getStats() {
     return this._pc.getStats(this.track);
   };
 }
@@ -4504,14 +4720,15 @@ function shimRemoveStream(window) {
       'removeStream' in window.RTCPeerConnection.prototype) {
     return;
   }
-  window.RTCPeerConnection.prototype.removeStream = function(stream) {
-    deprecated('removeStream', 'removeTrack');
-    this.getSenders().forEach(sender => {
-      if (sender.track && stream.getTracks().includes(sender.track)) {
-        this.removeTrack(sender);
-      }
-    });
-  };
+  window.RTCPeerConnection.prototype.removeStream =
+    function removeStream(stream) {
+      deprecated('removeStream', 'removeTrack');
+      this.getSenders().forEach(sender => {
+        if (sender.track && stream.getTracks().includes(sender.track)) {
+          this.removeTrack(sender);
+        }
+      });
+    };
 }
 
 function shimRTCDataChannel(window) {
@@ -4520,6 +4737,131 @@ function shimRTCDataChannel(window) {
   if (window.DataChannel && !window.RTCDataChannel) {
     window.RTCDataChannel = window.DataChannel;
   }
+}
+
+function shimAddTransceiver(window) {
+  // https://github.com/webrtcHacks/adapter/issues/998#issuecomment-516921647
+  // Firefox ignores the init sendEncodings options passed to addTransceiver
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=1396918
+  if (!(typeof window === 'object' && window.RTCPeerConnection)) {
+    return;
+  }
+  const origAddTransceiver = window.RTCPeerConnection.prototype.addTransceiver;
+  if (origAddTransceiver) {
+    window.RTCPeerConnection.prototype.addTransceiver =
+      function addTransceiver() {
+        this.setParametersPromises = [];
+        const initParameters = arguments[1];
+        const shouldPerformCheck = initParameters &&
+                                  'sendEncodings' in initParameters;
+        if (shouldPerformCheck) {
+          // If sendEncodings params are provided, validate grammar
+          initParameters.sendEncodings.forEach((encodingParam) => {
+            if ('rid' in encodingParam) {
+              const ridRegex = /^[a-z0-9]{0,16}$/i;
+              if (!ridRegex.test(encodingParam.rid)) {
+                throw new TypeError('Invalid RID value provided.');
+              }
+            }
+            if ('scaleResolutionDownBy' in encodingParam) {
+              if (!(parseFloat(encodingParam.scaleResolutionDownBy) >= 1.0)) {
+                throw new RangeError('scale_resolution_down_by must be >= 1.0');
+              }
+            }
+            if ('maxFramerate' in encodingParam) {
+              if (!(parseFloat(encodingParam.maxFramerate) >= 0)) {
+                throw new RangeError('max_framerate must be >= 0.0');
+              }
+            }
+          });
+        }
+        const transceiver = origAddTransceiver.apply(this, arguments);
+        if (shouldPerformCheck) {
+          // Check if the init options were applied. If not we do this in an
+          // asynchronous way and save the promise reference in a global object.
+          // This is an ugly hack, but at the same time is way more robust than
+          // checking the sender parameters before and after the createOffer
+          // Also note that after the createoffer we are not 100% sure that
+          // the params were asynchronously applied so we might miss the
+          // opportunity to recreate offer.
+          const {sender} = transceiver;
+          const params = sender.getParameters();
+          if (!('encodings' in params)) {
+            params.encodings = initParameters.sendEncodings;
+            sender.sendEncodings = initParameters.sendEncodings;
+            this.setParametersPromises.push(sender.setParameters(params)
+              .then(() => {
+                delete sender.sendEncodings;
+              }).catch(() => {
+                delete sender.sendEncodings;
+              })
+            );
+          }
+        }
+        return transceiver;
+      };
+  }
+}
+
+function shimGetParameters(window) {
+  if (!(typeof window === 'object' && window.RTCRtpSender)) {
+    return;
+  }
+  const origGetParameters = window.RTCRtpSender.prototype.getParameters;
+  if (origGetParameters) {
+    window.RTCRtpSender.prototype.getParameters =
+      function getParameters() {
+        var params = origGetParameters.apply(this, arguments);
+        if (!('sendEncodings' in this)) {
+          return params;
+        }
+        return Object.assign({}, {encodings: this.sendEncodings}, params);
+      };
+  }
+}
+
+function shimCreateOffer(window) {
+  // https://github.com/webrtcHacks/adapter/issues/998#issuecomment-516921647
+  // Firefox ignores the init sendEncodings options passed to addTransceiver
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=1396918
+  if (!(typeof window === 'object' && window.RTCPeerConnection)) {
+    return;
+  }
+  const origCreateOffer = window.RTCPeerConnection.prototype.createOffer;
+  window.RTCPeerConnection.prototype.createOffer = function createOffer() {
+    if (this.setParametersPromises && this.setParametersPromises.length) {
+      return Promise.all(this.setParametersPromises)
+      .then(() => {
+        return origCreateOffer.apply(this, arguments);
+      })
+      .finally(() => {
+        this.setParametersPromises = [];
+      });
+    }
+    return origCreateOffer.apply(this, arguments);
+  };
+}
+
+function shimCreateAnswer(window) {
+  // https://github.com/webrtcHacks/adapter/issues/998#issuecomment-516921647
+  // Firefox ignores the init sendEncodings options passed to addTransceiver
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=1396918
+  if (!(typeof window === 'object' && window.RTCPeerConnection)) {
+    return;
+  }
+  const origCreateAnswer = window.RTCPeerConnection.prototype.createAnswer;
+  window.RTCPeerConnection.prototype.createAnswer = function createAnswer() {
+    if (this.setParametersPromises && this.setParametersPromises.length) {
+      return Promise.all(this.setParametersPromises)
+      .then(() => {
+        return origCreateAnswer.apply(this, arguments);
+      })
+      .finally(() => {
+        this.setParametersPromises = [];
+      });
+    }
+    return origCreateAnswer.apply(this, arguments);
+  };
 }
 
 // CONCATENATED MODULE: ./node_modules/webrtc-adapter/src/js/safari/safari_shim.js
@@ -4538,53 +4880,63 @@ function shimLocalStreamsAPI(window) {
     return;
   }
   if (!('getLocalStreams' in window.RTCPeerConnection.prototype)) {
-    window.RTCPeerConnection.prototype.getLocalStreams = function() {
-      if (!this._localStreams) {
-        this._localStreams = [];
-      }
-      return this._localStreams;
-    };
+    window.RTCPeerConnection.prototype.getLocalStreams =
+      function getLocalStreams() {
+        if (!this._localStreams) {
+          this._localStreams = [];
+        }
+        return this._localStreams;
+      };
   }
   if (!('addStream' in window.RTCPeerConnection.prototype)) {
     const _addTrack = window.RTCPeerConnection.prototype.addTrack;
-    window.RTCPeerConnection.prototype.addStream = function(stream) {
+    window.RTCPeerConnection.prototype.addStream = function addStream(stream) {
       if (!this._localStreams) {
         this._localStreams = [];
       }
       if (!this._localStreams.includes(stream)) {
         this._localStreams.push(stream);
       }
-      stream.getTracks().forEach(track => _addTrack.call(this, track, stream));
+      // Try to emulate Chrome's behaviour of adding in audio-video order.
+      // Safari orders by track id.
+      stream.getAudioTracks().forEach(track => _addTrack.call(this, track,
+        stream));
+      stream.getVideoTracks().forEach(track => _addTrack.call(this, track,
+        stream));
     };
 
-    window.RTCPeerConnection.prototype.addTrack = function(track, stream) {
-      if (stream) {
-        if (!this._localStreams) {
-          this._localStreams = [stream];
-        } else if (!this._localStreams.includes(stream)) {
-          this._localStreams.push(stream);
+    window.RTCPeerConnection.prototype.addTrack =
+      function addTrack(track, ...streams) {
+        if (streams) {
+          streams.forEach((stream) => {
+            if (!this._localStreams) {
+              this._localStreams = [stream];
+            } else if (!this._localStreams.includes(stream)) {
+              this._localStreams.push(stream);
+            }
+          });
         }
-      }
-      return _addTrack.call(this, track, stream);
-    };
+        return _addTrack.apply(this, arguments);
+      };
   }
   if (!('removeStream' in window.RTCPeerConnection.prototype)) {
-    window.RTCPeerConnection.prototype.removeStream = function(stream) {
-      if (!this._localStreams) {
-        this._localStreams = [];
-      }
-      const index = this._localStreams.indexOf(stream);
-      if (index === -1) {
-        return;
-      }
-      this._localStreams.splice(index, 1);
-      const tracks = stream.getTracks();
-      this.getSenders().forEach(sender => {
-        if (tracks.includes(sender.track)) {
-          this.removeTrack(sender);
+    window.RTCPeerConnection.prototype.removeStream =
+      function removeStream(stream) {
+        if (!this._localStreams) {
+          this._localStreams = [];
         }
-      });
-    };
+        const index = this._localStreams.indexOf(stream);
+        if (index === -1) {
+          return;
+        }
+        this._localStreams.splice(index, 1);
+        const tracks = stream.getTracks();
+        this.getSenders().forEach(sender => {
+          if (tracks.includes(sender.track)) {
+            this.removeTrack(sender);
+          }
+        });
+      };
   }
 }
 
@@ -4593,9 +4945,10 @@ function shimRemoteStreamsAPI(window) {
     return;
   }
   if (!('getRemoteStreams' in window.RTCPeerConnection.prototype)) {
-    window.RTCPeerConnection.prototype.getRemoteStreams = function() {
-      return this._remoteStreams ? this._remoteStreams : [];
-    };
+    window.RTCPeerConnection.prototype.getRemoteStreams =
+      function getRemoteStreams() {
+        return this._remoteStreams ? this._remoteStreams : [];
+      };
   }
   if (!('onaddstream' in window.RTCPeerConnection.prototype)) {
     Object.defineProperty(window.RTCPeerConnection.prototype, 'onaddstream', {
@@ -4626,26 +4979,27 @@ function shimRemoteStreamsAPI(window) {
     });
     const origSetRemoteDescription =
       window.RTCPeerConnection.prototype.setRemoteDescription;
-    window.RTCPeerConnection.prototype.setRemoteDescription = function() {
-      const pc = this;
-      if (!this._onaddstreampoly) {
-        this.addEventListener('track', this._onaddstreampoly = function(e) {
-          e.streams.forEach(stream => {
-            if (!pc._remoteStreams) {
-              pc._remoteStreams = [];
-            }
-            if (pc._remoteStreams.indexOf(stream) >= 0) {
-              return;
-            }
-            pc._remoteStreams.push(stream);
-            const event = new Event('addstream');
-            event.stream = stream;
-            pc.dispatchEvent(event);
+    window.RTCPeerConnection.prototype.setRemoteDescription =
+      function setRemoteDescription() {
+        const pc = this;
+        if (!this._onaddstreampoly) {
+          this.addEventListener('track', this._onaddstreampoly = function(e) {
+            e.streams.forEach(stream => {
+              if (!pc._remoteStreams) {
+                pc._remoteStreams = [];
+              }
+              if (pc._remoteStreams.indexOf(stream) >= 0) {
+                return;
+              }
+              pc._remoteStreams.push(stream);
+              const event = new Event('addstream');
+              event.stream = stream;
+              pc.dispatchEvent(event);
+            });
           });
-        });
-      }
-      return origSetRemoteDescription.apply(pc, arguments);
-    };
+        }
+        return origSetRemoteDescription.apply(pc, arguments);
+      };
   }
 }
 
@@ -4654,31 +5008,33 @@ function shimCallbacksAPI(window) {
     return;
   }
   const prototype = window.RTCPeerConnection.prototype;
-  const createOffer = prototype.createOffer;
-  const createAnswer = prototype.createAnswer;
+  const origCreateOffer = prototype.createOffer;
+  const origCreateAnswer = prototype.createAnswer;
   const setLocalDescription = prototype.setLocalDescription;
   const setRemoteDescription = prototype.setRemoteDescription;
   const addIceCandidate = prototype.addIceCandidate;
 
-  prototype.createOffer = function(successCallback, failureCallback) {
-    const options = (arguments.length >= 2) ? arguments[2] : arguments[0];
-    const promise = createOffer.apply(this, [options]);
-    if (!failureCallback) {
-      return promise;
-    }
-    promise.then(successCallback, failureCallback);
-    return Promise.resolve();
-  };
+  prototype.createOffer =
+    function createOffer(successCallback, failureCallback) {
+      const options = (arguments.length >= 2) ? arguments[2] : arguments[0];
+      const promise = origCreateOffer.apply(this, [options]);
+      if (!failureCallback) {
+        return promise;
+      }
+      promise.then(successCallback, failureCallback);
+      return Promise.resolve();
+    };
 
-  prototype.createAnswer = function(successCallback, failureCallback) {
-    const options = (arguments.length >= 2) ? arguments[2] : arguments[0];
-    const promise = createAnswer.apply(this, [options]);
-    if (!failureCallback) {
-      return promise;
-    }
-    promise.then(successCallback, failureCallback);
-    return Promise.resolve();
-  };
+  prototype.createAnswer =
+    function createAnswer(successCallback, failureCallback) {
+      const options = (arguments.length >= 2) ? arguments[2] : arguments[0];
+      const promise = origCreateAnswer.apply(this, [options]);
+      if (!failureCallback) {
+        return promise;
+      }
+      promise.then(successCallback, failureCallback);
+      return Promise.resolve();
+    };
 
   let withCallback = function(description, successCallback, failureCallback) {
     const promise = setLocalDescription.apply(this, [description]);
@@ -4725,7 +5081,7 @@ function safari_shim_shimGetUserMedia(window) {
 
   if (!navigator.getUserMedia && navigator.mediaDevices &&
     navigator.mediaDevices.getUserMedia) {
-    navigator.getUserMedia = function(constraints, cb, errcb) {
+    navigator.getUserMedia = function getUserMedia(constraints, cb, errcb) {
       navigator.mediaDevices.getUserMedia(constraints)
       .then(cb, errcb);
     }.bind(navigator);
@@ -4744,31 +5100,35 @@ function shimConstraints(constraints) {
 }
 
 function shimRTCIceServerUrls(window) {
+  if (!window.RTCPeerConnection) {
+    return;
+  }
   // migrate from non-spec RTCIceServer.url to RTCIceServer.urls
   const OrigPeerConnection = window.RTCPeerConnection;
-  window.RTCPeerConnection = function(pcConfig, pcConstraints) {
-    if (pcConfig && pcConfig.iceServers) {
-      const newIceServers = [];
-      for (let i = 0; i < pcConfig.iceServers.length; i++) {
-        let server = pcConfig.iceServers[i];
-        if (!server.hasOwnProperty('urls') &&
-            server.hasOwnProperty('url')) {
-          deprecated('RTCIceServer.url', 'RTCIceServer.urls');
-          server = JSON.parse(JSON.stringify(server));
-          server.urls = server.url;
-          delete server.url;
-          newIceServers.push(server);
-        } else {
-          newIceServers.push(pcConfig.iceServers[i]);
+  window.RTCPeerConnection =
+    function RTCPeerConnection(pcConfig, pcConstraints) {
+      if (pcConfig && pcConfig.iceServers) {
+        const newIceServers = [];
+        for (let i = 0; i < pcConfig.iceServers.length; i++) {
+          let server = pcConfig.iceServers[i];
+          if (!server.hasOwnProperty('urls') &&
+              server.hasOwnProperty('url')) {
+            deprecated('RTCIceServer.url', 'RTCIceServer.urls');
+            server = JSON.parse(JSON.stringify(server));
+            server.urls = server.url;
+            delete server.url;
+            newIceServers.push(server);
+          } else {
+            newIceServers.push(pcConfig.iceServers[i]);
+          }
         }
+        pcConfig.iceServers = newIceServers;
       }
-      pcConfig.iceServers = newIceServers;
-    }
-    return new OrigPeerConnection(pcConfig, pcConstraints);
-  };
+      return new OrigPeerConnection(pcConfig, pcConstraints);
+    };
   window.RTCPeerConnection.prototype = OrigPeerConnection.prototype;
   // wrap static methods. Currently just generateCertificate.
-  if ('generateCertificate' in window.RTCPeerConnection) {
+  if ('generateCertificate' in OrigPeerConnection) {
     Object.defineProperty(window.RTCPeerConnection, 'generateCertificate', {
       get() {
         return OrigPeerConnection.generateCertificate;
@@ -4779,11 +5139,9 @@ function shimRTCIceServerUrls(window) {
 
 function shimTrackEventTransceiver(window) {
   // Add event.transceiver member over deprecated event.receiver
-  if (typeof window === 'object' && window.RTCPeerConnection &&
-      ('receiver' in window.RTCTrackEvent.prototype) &&
-      // can't check 'transceiver' in window.RTCTrackEvent.prototype, as it is
-      // defined for some reason even when window.RTCTransceiver is not.
-      !window.RTCTransceiver) {
+  if (typeof window === 'object' && window.RTCTrackEvent &&
+      'receiver' in window.RTCTrackEvent.prototype &&
+      !('transceiver' in window.RTCTrackEvent.prototype)) {
     Object.defineProperty(window.RTCTrackEvent.prototype, 'transceiver', {
       get() {
         return {receiver: this.receiver};
@@ -4794,62 +5152,70 @@ function shimTrackEventTransceiver(window) {
 
 function shimCreateOfferLegacy(window) {
   const origCreateOffer = window.RTCPeerConnection.prototype.createOffer;
-  window.RTCPeerConnection.prototype.createOffer = function(offerOptions) {
-    if (offerOptions) {
-      if (typeof offerOptions.offerToReceiveAudio !== 'undefined') {
-        // support bit values
-        offerOptions.offerToReceiveAudio = !!offerOptions.offerToReceiveAudio;
-      }
-      const audioTransceiver = this.getTransceivers().find(transceiver =>
-        transceiver.sender.track &&
-        transceiver.sender.track.kind === 'audio');
-      if (offerOptions.offerToReceiveAudio === false && audioTransceiver) {
-        if (audioTransceiver.direction === 'sendrecv') {
-          if (audioTransceiver.setDirection) {
-            audioTransceiver.setDirection('sendonly');
-          } else {
-            audioTransceiver.direction = 'sendonly';
-          }
-        } else if (audioTransceiver.direction === 'recvonly') {
-          if (audioTransceiver.setDirection) {
-            audioTransceiver.setDirection('inactive');
-          } else {
-            audioTransceiver.direction = 'inactive';
-          }
+  window.RTCPeerConnection.prototype.createOffer =
+    function createOffer(offerOptions) {
+      if (offerOptions) {
+        if (typeof offerOptions.offerToReceiveAudio !== 'undefined') {
+          // support bit values
+          offerOptions.offerToReceiveAudio =
+            !!offerOptions.offerToReceiveAudio;
         }
-      } else if (offerOptions.offerToReceiveAudio === true &&
-          !audioTransceiver) {
-        this.addTransceiver('audio');
-      }
+        const audioTransceiver = this.getTransceivers().find(transceiver =>
+          transceiver.receiver.track.kind === 'audio');
+        if (offerOptions.offerToReceiveAudio === false && audioTransceiver) {
+          if (audioTransceiver.direction === 'sendrecv') {
+            if (audioTransceiver.setDirection) {
+              audioTransceiver.setDirection('sendonly');
+            } else {
+              audioTransceiver.direction = 'sendonly';
+            }
+          } else if (audioTransceiver.direction === 'recvonly') {
+            if (audioTransceiver.setDirection) {
+              audioTransceiver.setDirection('inactive');
+            } else {
+              audioTransceiver.direction = 'inactive';
+            }
+          }
+        } else if (offerOptions.offerToReceiveAudio === true &&
+            !audioTransceiver) {
+          this.addTransceiver('audio');
+        }
 
-      if (typeof offerOptions.offerToReceiveVideo !== 'undefined') {
-        // support bit values
-        offerOptions.offerToReceiveVideo = !!offerOptions.offerToReceiveVideo;
-      }
-      const videoTransceiver = this.getTransceivers().find(transceiver =>
-        transceiver.sender.track &&
-        transceiver.sender.track.kind === 'video');
-      if (offerOptions.offerToReceiveVideo === false && videoTransceiver) {
-        if (videoTransceiver.direction === 'sendrecv') {
-          if (videoTransceiver.setDirection) {
-            videoTransceiver.setDirection('sendonly');
-          } else {
-            videoTransceiver.direction = 'sendonly';
-          }
-        } else if (videoTransceiver.direction === 'recvonly') {
-          if (videoTransceiver.setDirection) {
-            videoTransceiver.setDirection('inactive');
-          } else {
-            videoTransceiver.direction = 'inactive';
-          }
+        if (typeof offerOptions.offerToReceiveVideo !== 'undefined') {
+          // support bit values
+          offerOptions.offerToReceiveVideo =
+            !!offerOptions.offerToReceiveVideo;
         }
-      } else if (offerOptions.offerToReceiveVideo === true &&
-          !videoTransceiver) {
-        this.addTransceiver('video');
+        const videoTransceiver = this.getTransceivers().find(transceiver =>
+          transceiver.receiver.track.kind === 'video');
+        if (offerOptions.offerToReceiveVideo === false && videoTransceiver) {
+          if (videoTransceiver.direction === 'sendrecv') {
+            if (videoTransceiver.setDirection) {
+              videoTransceiver.setDirection('sendonly');
+            } else {
+              videoTransceiver.direction = 'sendonly';
+            }
+          } else if (videoTransceiver.direction === 'recvonly') {
+            if (videoTransceiver.setDirection) {
+              videoTransceiver.setDirection('inactive');
+            } else {
+              videoTransceiver.direction = 'inactive';
+            }
+          }
+        } else if (offerOptions.offerToReceiveVideo === true &&
+            !videoTransceiver) {
+          this.addTransceiver('video');
+        }
       }
-    }
-    return origCreateOffer.apply(this, arguments);
-  };
+      return origCreateOffer.apply(this, arguments);
+    };
+}
+
+function shimAudioContext(window) {
+  if (typeof window !== 'object' || window.AudioContext) {
+    return;
+  }
+  window.AudioContext = window.webkitAudioContext;
 }
 
 // EXTERNAL MODULE: ./node_modules/sdp/sdp.js
@@ -4879,7 +5245,7 @@ function shimRTCIceCandidate(window) {
   }
 
   const NativeRTCIceCandidate = window.RTCIceCandidate;
-  window.RTCIceCandidate = function(args) {
+  window.RTCIceCandidate = function RTCIceCandidate(args) {
     // Remove the a= which shouldn't be part of the candidate string.
     if (typeof args === 'object' && args.candidate &&
         args.candidate.indexOf('a=') === 0) {
@@ -4895,7 +5261,7 @@ function shimRTCIceCandidate(window) {
           parsedCandidate);
 
       // Add a serializer that does not serialize the extra attributes.
-      augmentedCandidate.toJSON = function() {
+      augmentedCandidate.toJSON = function toJSON() {
         return {
           candidate: augmentedCandidate.candidate,
           sdpMid: augmentedCandidate.sdpMid,
@@ -4923,7 +5289,7 @@ function shimRTCIceCandidate(window) {
 }
 
 function shimMaxMessageSize(window) {
-  if (window.RTCSctpTransport || !window.RTCPeerConnection) {
+  if (!window.RTCPeerConnection) {
     return;
   }
   const browserDetails = detectBrowser(window);
@@ -4937,6 +5303,9 @@ function shimMaxMessageSize(window) {
   }
 
   const sctpInDescription = function(description) {
+    if (!description || !description.sdp) {
+      return false;
+    }
     const sections = sdp_default.a.splitSections(description.sdp);
     sections.shift();
     return sections.some(mediaSection => {
@@ -5018,42 +5387,58 @@ function shimMaxMessageSize(window) {
 
   const origSetRemoteDescription =
       window.RTCPeerConnection.prototype.setRemoteDescription;
-  window.RTCPeerConnection.prototype.setRemoteDescription = function() {
-    this._sctp = null;
-
-    if (sctpInDescription(arguments[0])) {
-      // Check if the remote is FF.
-      const isFirefox = getRemoteFirefoxVersion(arguments[0]);
-
-      // Get the maximum message size the local peer is capable of sending
-      const canSendMMS = getCanSendMaxMessageSize(isFirefox);
-
-      // Get the maximum message size of the remote peer.
-      const remoteMMS = getMaxMessageSize(arguments[0], isFirefox);
-
-      // Determine final maximum message size
-      let maxMessageSize;
-      if (canSendMMS === 0 && remoteMMS === 0) {
-        maxMessageSize = Number.POSITIVE_INFINITY;
-      } else if (canSendMMS === 0 || remoteMMS === 0) {
-        maxMessageSize = Math.max(canSendMMS, remoteMMS);
-      } else {
-        maxMessageSize = Math.min(canSendMMS, remoteMMS);
+  window.RTCPeerConnection.prototype.setRemoteDescription =
+    function setRemoteDescription() {
+      this._sctp = null;
+      // Chrome decided to not expose .sctp in plan-b mode.
+      // As usual, adapter.js has to do an 'ugly worakaround'
+      // to cover up the mess.
+      if (browserDetails.browser === 'chrome' && browserDetails.version >= 76) {
+        const {sdpSemantics} = this.getConfiguration();
+        if (sdpSemantics === 'plan-b') {
+          Object.defineProperty(this, 'sctp', {
+            get() {
+              return typeof this._sctp === 'undefined' ? null : this._sctp;
+            },
+            enumerable: true,
+            configurable: true,
+          });
+        }
       }
 
-      // Create a dummy RTCSctpTransport object and the 'maxMessageSize'
-      // attribute.
-      const sctp = {};
-      Object.defineProperty(sctp, 'maxMessageSize', {
-        get() {
-          return maxMessageSize;
-        }
-      });
-      this._sctp = sctp;
-    }
+      if (sctpInDescription(arguments[0])) {
+        // Check if the remote is FF.
+        const isFirefox = getRemoteFirefoxVersion(arguments[0]);
 
-    return origSetRemoteDescription.apply(this, arguments);
-  };
+        // Get the maximum message size the local peer is capable of sending
+        const canSendMMS = getCanSendMaxMessageSize(isFirefox);
+
+        // Get the maximum message size of the remote peer.
+        const remoteMMS = getMaxMessageSize(arguments[0], isFirefox);
+
+        // Determine final maximum message size
+        let maxMessageSize;
+        if (canSendMMS === 0 && remoteMMS === 0) {
+          maxMessageSize = Number.POSITIVE_INFINITY;
+        } else if (canSendMMS === 0 || remoteMMS === 0) {
+          maxMessageSize = Math.max(canSendMMS, remoteMMS);
+        } else {
+          maxMessageSize = Math.min(canSendMMS, remoteMMS);
+        }
+
+        // Create a dummy RTCSctpTransport object and the 'maxMessageSize'
+        // attribute.
+        const sctp = {};
+        Object.defineProperty(sctp, 'maxMessageSize', {
+          get() {
+            return maxMessageSize;
+          }
+        });
+        this._sctp = sctp;
+      }
+
+      return origSetRemoteDescription.apply(this, arguments);
+    };
 }
 
 function shimSendThrowTypeError(window) {
@@ -5068,7 +5453,7 @@ function shimSendThrowTypeError(window) {
 
   function wrapDcSend(dc, pc) {
     const origDataChannelSend = dc.send;
-    dc.send = function() {
+    dc.send = function send() {
       const data = arguments[0];
       const length = data.length || data.size || data.byteLength;
       if (dc.readyState === 'open' &&
@@ -5081,11 +5466,12 @@ function shimSendThrowTypeError(window) {
   }
   const origCreateDataChannel =
     window.RTCPeerConnection.prototype.createDataChannel;
-  window.RTCPeerConnection.prototype.createDataChannel = function() {
-    const dataChannel = origCreateDataChannel.apply(this, arguments);
-    wrapDcSend(dataChannel, this);
-    return dataChannel;
-  };
+  window.RTCPeerConnection.prototype.createDataChannel =
+    function createDataChannel() {
+      const dataChannel = origCreateDataChannel.apply(this, arguments);
+      wrapDcSend(dataChannel, this);
+      return dataChannel;
+    };
   wrapPeerConnectionEvent(window, 'datachannel', e => {
     wrapDcSend(e.channel, e.target);
     return e;
@@ -5157,7 +5543,7 @@ function shimConnectionState(window) {
 }
 
 function removeAllowExtmapMixed(window) {
-  /* remove a=extmap-allow-mixed for Chrome < M71 */
+  /* remove a=extmap-allow-mixed for webrtc.org < M71 */
   if (!window.RTCPeerConnection) {
     return;
   }
@@ -5165,8 +5551,12 @@ function removeAllowExtmapMixed(window) {
   if (browserDetails.browser === 'chrome' && browserDetails.version >= 71) {
     return;
   }
+  if (browserDetails.browser === 'safari' && browserDetails.version >= 605) {
+    return;
+  }
   const nativeSRD = window.RTCPeerConnection.prototype.setRemoteDescription;
-  window.RTCPeerConnection.prototype.setRemoteDescription = function(desc) {
+  window.RTCPeerConnection.prototype.setRemoteDescription =
+  function setRemoteDescription(desc) {
     if (desc && desc.sdp && desc.sdp.indexOf('\na=extmap-allow-mixed') !== -1) {
       desc.sdp = desc.sdp.split('\n').filter((line) => {
         return line.trim() !== 'a=extmap-allow-mixed';
@@ -5220,6 +5610,10 @@ function adapterFactory({window} = {}, options = {
         logging('Chrome shim is not included in this adapter release.');
         return adapter;
       }
+      if (browserDetails.version === null) {
+        logging('Chrome shim can not determine version, not shimming.');
+        return adapter;
+      }
       logging('adapter.js shimming chrome.');
       // Export to the adapter global object visible in the browser.
       adapter.browserShim = chrome_shim_namespaceObject;
@@ -5230,6 +5624,7 @@ function adapterFactory({window} = {}, options = {
       shimOnTrack(window);
       shimAddTrackRemoveTrack(window);
       shimGetSendersWithDtmf(window);
+      shimGetStats(window);
       shimSenderReceiverGetStats(window);
       fixNegotiationNeeded(window);
 
@@ -5256,6 +5651,10 @@ function adapterFactory({window} = {}, options = {
       shimSenderGetStats(window);
       shimReceiverGetStats(window);
       shimRTCDataChannel(window);
+      shimAddTransceiver(window);
+      shimGetParameters(window);
+      shimCreateOffer(window);
+      shimCreateAnswer(window);
 
       shimRTCIceCandidate(window);
       shimConnectionState(window);
@@ -5297,6 +5696,7 @@ function adapterFactory({window} = {}, options = {
       shimRemoteStreamsAPI(window);
       shimTrackEventTransceiver(window);
       safari_shim_shimGetUserMedia(window);
+      shimAudioContext(window);
 
       shimRTCIceCandidate(window);
       shimMaxMessageSize(window);
@@ -5578,7 +5978,12 @@ function normalizeComponent (
     options._ssrRegister = hook
   } else if (injectStyles) {
     hook = shadowMode
-      ? function () { injectStyles.call(this, this.$root.$options.shadowRoot) }
+      ? function () {
+        injectStyles.call(
+          this,
+          (options.functional ? this.parent : this).$root.$options.shadowRoot
+        )
+      }
       : injectStyles
   }
 
@@ -5587,7 +5992,7 @@ function normalizeComponent (
       // for template-only hot-reload because in that case the render fn doesn't
       // go through the normalizer
       options._injectStyles = hook
-      // register for functioal component in vue file
+      // register for functional component in vue file
       var originalRender = options.render
       options.render = function renderWithStyleInjection (h, context) {
         hook.call(context)
@@ -5646,7 +6051,11 @@ component.options.__file = "src/Scanner.vue"
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
+// ESM COMPAT FLAG
 __webpack_require__.r(__webpack_exports__);
+
+// EXPORTS
+__webpack_require__.d(__webpack_exports__, "default", function() { return /* binding */ addStylesClient; });
 
 // CONCATENATED MODULE: ./node_modules/vue-style-loader/lib/listToStyles.js
 /**
@@ -5678,7 +6087,6 @@ function listToStyles (parentId, list) {
 }
 
 // CONCATENATED MODULE: ./node_modules/vue-style-loader/lib/addStylesClient.js
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return addStylesClient; });
 /*
   MIT License http://www.opensource.org/licenses/mit-license.php
   Author Tobias Koppers @sokra
