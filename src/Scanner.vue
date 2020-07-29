@@ -82,7 +82,10 @@ export default {
       }),
       validator: o => typeof o.min === 'number' && typeof o.max === 'number',
     },
-    facingMode: 'environment'
+    facingMode: {
+      type: String,
+      default: () => 'environment'
+    }
   },
   data: function() {
     return {
