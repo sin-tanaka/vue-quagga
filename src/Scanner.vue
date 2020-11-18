@@ -82,6 +82,10 @@ export default {
       }),
       validator: o => typeof o.min === 'number' && typeof o.max === 'number',
     },
+    facingMode: {
+      type: String,
+      default: () => 'environment'
+    }
   },
   data: function() {
     return {
@@ -91,7 +95,7 @@ export default {
           constraints: {
             width: { min: this.readerSize.width },
             height: { min: this.readerSize.height },
-            facingMode: 'environment',
+            facingMode: this.facingMode,
             aspectRatio: { min: 1, max: 2 },
           },
         },
